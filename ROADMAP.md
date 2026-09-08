@@ -18,7 +18,7 @@ Each phase should leave the system demonstrable and preserve the privacy invaria
 - A preview deployment serves the UI and a health endpoint.
 - CI blocks type, lint, unit-test, and migration failures.
 - The auth spike benchmarks Argon2id in the deployed Worker runtime; if it is not practical, it benchmarks a versioned PBKDF2-HMAC-SHA-256 fallback and records parameters.
-- A complete preview flow covers admin invite, locked email, password creation, login, session renewal/logout, and password reset with rate limits and generic errors.
+- A complete preview flow covers admin invite, locked email, password creation, login, session renewal/logout, password reset, and administrator TOTP MFA/recovery with rate limits and generic errors.
 - No product feature implementation is required beyond the vertical slice.
 
 ## Phase 1 — Identity, authorization, and data foundation

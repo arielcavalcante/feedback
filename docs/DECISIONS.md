@@ -28,7 +28,7 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 - **Status:** accepted, hashing parameters pending spike
 - **Decision:** Admins invite a pre-created user by email. The link carries a single-use opaque token bound server-side to the locked email; the user creates a password and receives a server-managed session. There is no Microsoft login or public signup.
 - **Why:** Keeps onboarding simple and under product control without requiring an organization identity-provider integration.
-- **Consequences:** The application now owns password security, recovery, session lifecycle, abuse prevention, and transactional email reliability. Use digest-only invite/reset/session tokens and secure cookies. Prefer Argon2id if practical on Workers; otherwise use a versioned, benchmarked PBKDF2-HMAC-SHA-256 Web Crypto fallback. MFA is not in MVP but remains a security follow-up.
+- **Consequences:** The application now owns password security, recovery, session lifecycle, abuse prevention, and transactional email reliability. Use digest-only invite/reset/session tokens and secure cookies. Prefer Argon2id if practical on Workers; otherwise use a versioned, benchmarked PBKDF2-HMAC-SHA-256 Web Crypto fallback. TOTP MFA for administrators is required before the production pilot and is a release blocker.
 
 ## ADR-005 — Multi-role RBAC
 

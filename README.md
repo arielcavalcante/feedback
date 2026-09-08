@@ -111,7 +111,7 @@ There is no public signup. An admin creates a user and sends an invitation email
 
 Passwords are never stored or encrypted reversibly. Prefer Argon2id with OWASP-recommended parameters if a Worker compatibility/performance spike succeeds; otherwise use versioned PBKDF2-HMAC-SHA-256 through Workers Web Crypto with a unique random salt, a production-tuned work factor, and an optional pepper kept in a Worker secret. Sessions use random opaque tokens stored only as digests server-side and sent in `Secure`, `HttpOnly`, `SameSite=Lax` cookies. Invitations and reset tokens expire, are single-use, and are invalidated transactionally.
 
-The invite/reset pages use HTTPS, a fixed allowlisted application origin, `Referrer-Policy: no-referrer`, generic error responses, and rate limiting. Without MFA, the initial policy is at least 15 characters and supports up to at least 128, with Unicode/whitespace and password-manager paste supported, no composition rules, no silent truncation, and no forced periodic changes. Screen common/breached passwords without disclosing plaintext. Revisit MFA for privileged accounts before broad rollout.
+The invite/reset pages use HTTPS, a fixed allowlisted application origin, `Referrer-Policy: no-referrer`, generic error responses, and rate limiting. Without MFA, the initial policy is at least 15 characters and supports up to at least 128, with Unicode/whitespace and password-manager paste supported, no composition rules, no silent truncation, and no forced periodic changes. Screen common/breached passwords without disclosing plaintext. TOTP MFA is required for administrators before the production pilot; its implementation remains a release blocker.
 
 ## Planning documents
 

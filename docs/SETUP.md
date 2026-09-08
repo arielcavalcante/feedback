@@ -32,7 +32,7 @@ Protect a one-time endpoint with a secret and disable it after use. This is the 
 - Session absolute lifetime: 30 days.
 - Minimum password: 15 characters because MVP has no MFA; maximum supported length: 128.
 - No composition rules, silent truncation, or routine forced rotation.
-- MFA is planned for administrators before broad rollout.
+- TOTP MFA through an authenticator app is required for administrators before the production pilot. Recovery codes are single-use and stored only as slow/digest hashes; TOTP secrets must be encrypted with a separately managed Worker secret.
 
 ## 5. Cloudflare resources
 
@@ -51,3 +51,17 @@ Accepted anchor: Friday, September 18, 2026 at 09:00 `America/Fortaleza`, repeat
 ## 7. Organization structure
 
 The schema supports users with multiple roles and memberships in multiple teams. A team may hold multiple coordinator assignments and marks one as primary for cycle snapshotting. MVP administration may enforce one active team membership and one primary coordinator, but the relational structure does not require a future migration to expand this.
+
+## 8. Accepted privacy and retention defaults
+
+- Anonymity threshold: three submitted responses for the exact authorized cohort.
+- Small teams/cycles below threshold receive no results or comments; they are not silently pooled.
+- Qualitative comments may be shown verbatim only above threshold, without time/order cues, and may be withheld when self-identifying or harmful.
+- Survey attribution, numeric answers, and qualitative text: 24 months.
+- Meeting outcomes and action items: 36 months after the meeting.
+- Completed/failed email delivery records: 90 days; never retain rendered message bodies.
+- Expired/used invitation and reset metadata plus ended sessions: 30 days.
+- Rate-limit buckets: delete after 30 days of inactivity.
+- Audit logs and organization assignment history: 24 months after the related user's deactivation, unless a legal requirement sets a longer period.
+
+These are application defaults, not substitutes for a final employment/privacy-law review.
