@@ -18,7 +18,7 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 
 ## ADR-003 — Drizzle for D1 access
 
-- **Status:** proposed
+- **Status:** accepted
 - **Decision:** Prefer Drizzle ORM and checked-in SQL migrations.
 - **Why:** Typed relational access and reviewable migrations without hiding SQL/privacy-sensitive query behavior.
 - **Consequences:** Prototype D1 migration/local workflow before final acceptance; privacy aggregate queries may use explicit SQL.
@@ -53,7 +53,7 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 
 ## ADR-008 — Minimum cohort threshold
 
-- **Status:** proposed
+- **Status:** accepted
 - **Decision:** Default coordinator reporting threshold is three eligible submitted responses, snapshotted per cycle, with stronger qualitative/differencing protections.
 - **Why:** Reduce straightforward identification risk in small groups.
 - **Consequences:** Some teams/cycles receive no report. Privacy owner must approve whether `3` is sufficient and define small-team behavior.

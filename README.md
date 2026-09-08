@@ -2,7 +2,7 @@
 
 Planning repository for a small internal feedback platform. The product runs a private, recurring feedback process while keeping survey respondents anonymous to coordinators and colleagues.
 
-This initial commit contains product and engineering plans only. It intentionally does not include an application implementation.
+Development has started. The repository now contains a React/Worker foundation, initial D1/Drizzle schema, invitation-only authentication slice, and schedule/holiday primitives; product dashboards remain phased work.
 
 ## Product overview
 
@@ -80,6 +80,21 @@ All persisted instants use UTC. The recurrence anchor and IANA time zone are sto
 
 During implementation, keep secrets in local environment files excluded by Git and in Cloudflare secrets for deployed environments. Never commit tokens or production personal data.
 
+## Local development
+
+```sh
+pnpm install
+cp .dev.vars.example .dev.vars
+pnpm db:migrate:local
+pnpm dev
+```
+
+Run `pnpm check` before committing. It type-checks, tests, validates Drizzle migrations, and builds the Worker plus React client. The current vertical slice exposes `/api/health`, invitation acceptance, login/logout, session lookup, password-reset endpoints, and an administrator invitation endpoint. The first production administrator is created with the operator command documented in `docs/SETUP.md`.
+
+The production build temporarily excludes `.dev.vars` and scans `dist` for secret files/markers before succeeding. `pnpm preview` follows Cloudflare's local-preview behavior and may copy `.dev.vars` into ignored build output; Cloudflare documents that this preview copy is not deployed.
+
+The D1 ID in `wrangler.jsonc` is intentionally a placeholder until Wrangler is reauthenticated and the already-created remote database is positively identified.
+
 ## Deployment prerequisites
 
 Before production deployment, an owner must:
@@ -105,6 +120,7 @@ The invite/reset pages use HTTPS, a fixed allowlisted application origin, `Refer
 - [Privacy and anonymity rules](docs/PRIVACY.md)
 - [Architecture decisions and open questions](docs/DECISIONS.md)
 - [Prepared GitHub backlog](docs/GITHUB_ISSUES.md)
+- [Accepted setup choices and operator actions](docs/SETUP.md)
 
 ## Publishing to GitHub
 

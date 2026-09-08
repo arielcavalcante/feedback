@@ -49,6 +49,12 @@ Columns: `id`, `user_id`, `token_digest` (unique), `expires_at`, optional `used_
 
 Use the same high-entropy, digest-only, fixed-origin, single-use rules as invitations. Reset requests return a generic response regardless of whether the account exists.
 
+### `auth_rate_limits`
+
+Columns: `key_hash`, `action`, `window_started_at`, `attempts`, optional `blocked_until`, `updated_at`; composite primary key on `(key_hash, action)`.
+
+Rate-limit keys are one-way digests derived from normalized identity or request IP plus a secret pepper, so D1 does not become a raw email/IP attempt log. Login and password recovery have independent limits. Successful login clears the identity bucket; stale buckets are periodically deleted.
+
 ### `roles`
 
 Seeded lookup table: `admin`, `coordinator`, `employee`.
@@ -71,9 +77,15 @@ Index current membership by `(team_id, ends_at)` and user by `(user_id, ends_at)
 
 ### `team_coordinators`
 
-Columns: `id`, `team_id`, `user_id`, `starts_at`, optional `ends_at`, `created_at`, `created_by_user_id`.
+Columns: `id`, `team_id`, `user_id`, `starts_at`, optional `ends_at`, `is_primary`, `created_at`, `created_by_user_id`.
 
-Coordinator role and team assignment are both required for coordinator capabilities. Decide whether multiple simultaneous coordinators are permitted.
+Coordinator role and team assignment are both required for coordinator capabilities. Multiple assignments are structurally supported; one primary coordinator is used for MVP cycle snapshots.
+
+### `holidays`
+
+Columns: `local_date` (primary key), `name`, `scope` (`national`, `state`, `fortaleza`, `company`), `created_at`.
+
+The scheduler treats Monday–Friday dates absent from this table as workdays. Holiday data changes email dates only: employee mail moves backward from a holiday Friday and coordinator mail moves forward from a holiday Monday. Survey open/close/report instants remain anchored. Review and load each year's official calendar before that year begins.
 
 ## Feedback cycle
 

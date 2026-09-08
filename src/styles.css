@@ -1,0 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700&display=swap');
+
+:root { font-family: "DM Sans", system-ui, sans-serif; color: #172a2b; background: #f5f1e8; font-synthesis: none; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button, input { font: inherit; }
+.shell { min-height: 100vh; display: grid; grid-template-columns: minmax(330px, .9fr) minmax(420px, 1.1fr); }
+.brand-panel { position: relative; padding: clamp(32px, 6vw, 88px); background: #102e30; color: #f9f4e8; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
+.brand-panel::after { content: ""; position: absolute; width: 430px; height: 430px; right: -250px; bottom: -180px; border: 1px solid rgba(230,172,93,.26); border-radius: 50%; box-shadow: 0 0 0 60px rgba(230,172,93,.04), 0 0 0 120px rgba(230,172,93,.03); }
+.mark { display: flex; gap: 6px; align-items: end; height: 32px; }
+.mark span { width: 8px; background: #e6ac5d; border-radius: 6px; }
+.mark span:nth-child(1) { height: 14px; }.mark span:nth-child(2) { height: 24px; }.mark span:nth-child(3) { height: 32px; }
+.eyebrow { margin: 0 0 18px; text-transform: uppercase; letter-spacing: .14em; font-size: 12px; font-weight: 700; color: #e6ac5d; }
+.brand-panel h1, .welcome h1 { font: 700 clamp(42px, 5vw, 70px)/1.02 Manrope, sans-serif; letter-spacing: -.05em; margin: 0; }
+.brand-copy { color: #bfd0cc; font-size: 18px; line-height: 1.65; max-width: 460px; margin-top: 28px; }
+.privacy-note { color: #9bb3af; font-size: 13px; padding-left: 22px; position: relative; z-index: 1; }
+.privacy-note::before { content: ""; position: absolute; width: 9px; height: 9px; border: 2px solid #e6ac5d; border-radius: 50%; left: 0; top: 3px; }
+.form-panel { display: grid; place-items: center; padding: 32px; background: #f7f3eb; }
+.form-card { width: min(100%, 440px); }
+.form-card h2 { font: 700 34px/1.15 Manrope, sans-serif; letter-spacing: -.035em; margin: 0 0 36px; }
+.accent { color: #a9682d; }
+.stack { display: grid; gap: 20px; }
+label { display: grid; gap: 8px; color: #304446; font-weight: 600; font-size: 14px; }
+input { width: 100%; padding: 14px 15px; border: 1px solid #c9cec8; border-radius: 10px; background: #fffdf8; color: #172a2b; outline: none; transition: .16s ease; }
+input:focus { border-color: #28706d; box-shadow: 0 0 0 3px rgba(40,112,109,.14); }
+input:read-only { background: #ecece6; color: #5d6b6b; }
+small, .helper { color: #687775; font-weight: 400; line-height: 1.5; }
+.primary { border: 0; border-radius: 10px; padding: 15px 20px; color: #fff; background: #1d5c5a; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px rgba(29,92,90,.16); }
+.primary:hover { background: #174d4b; }.primary:disabled { opacity: .6; cursor: wait; }
+.error { margin: 0; padding: 12px 14px; border-left: 3px solid #b6463a; background: #fae9e4; color: #8c3028; border-radius: 4px; font-size: 14px; }
+.success { margin: 0; padding: 12px 14px; border-left: 3px solid #28706d; background: #e2efeb; color: #225653; border-radius: 4px; font-size: 14px; }
+.align-left { justify-self: start; padding: 0; }.link-button { display: block; text-align: center; text-decoration: none; }
+.centered { min-height: 100vh; display: grid; place-items: center; background: #102e30; color: #f7f3eb; }
+.home { min-height: 100vh; background: #f7f3eb; }
+.home nav { height: 72px; padding: 0 clamp(24px, 6vw, 88px); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #dfe1da; }
+.wordmark { font: 700 17px Manrope, sans-serif; }.text-button { border: 0; background: none; color: #1d5c5a; font-weight: 700; cursor: pointer; }
+.welcome { max-width: 800px; padding: clamp(64px, 11vw, 140px) clamp(24px, 6vw, 88px); }
+.welcome h1 { font-size: clamp(42px, 6vw, 72px); color: #17383a; }.welcome > p:not(.eyebrow) { font-size: 19px; color: #617270; line-height: 1.6; }
+.roles { display: flex; gap: 8px; margin-top: 30px; }.roles span { padding: 7px 12px; border-radius: 999px; background: #dce9e5; color: #235b59; font-size: 13px; font-weight: 700; text-transform: capitalize; }
+@media (max-width: 760px) { .shell { grid-template-columns: 1fr; }.brand-panel { min-height: 310px; padding: 28px; }.brand-panel h1 { font-size: 40px; }.brand-copy { font-size: 16px; margin-top: 18px; }.privacy-note { margin-top: 32px; }.form-panel { padding: 48px 24px 64px; }.form-card h2 { font-size: 30px; } }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
