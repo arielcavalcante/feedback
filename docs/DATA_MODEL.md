@@ -18,13 +18,36 @@ This is a logical schema for design and issue planning, not a committed migratio
 | Column | Notes |
 |---|---|
 | `id` | Primary key |
-| `entra_subject` | Stable tenant-scoped external identity; unique |
-| `email` | Normalized display/contact email; unique within the organization |
+| `email` | Normalized login/contact email; unique case-insensitively |
 | `display_name` | Current display name |
 | `is_active` | Application access flag |
 | `created_at`, `updated_at`, `deactivated_at` | UTC audit timestamps |
 
-Do not use mutable email as the sole authentication key. Record the final Entra claim mapping after the authentication spike.
+The immutable internal `id`, not email, owns relationships. Email changes require a separate verified workflow and must not rewrite historical ownership.
+
+### `auth_credentials`
+
+One current password credential per user. Columns: `user_id` (primary/foreign key), `password_hash` (self-describing/versioned encoded hash), `password_changed_at`, optional `must_change_password`, `created_at`, `updated_at`.
+
+Never store plaintext or reversibly encrypted passwords. Prefer Argon2id if the Worker spike proves it practical. The fallback is PBKDF2-HMAC-SHA-256 using Workers Web Crypto, a unique random salt per password, versioned parameters, and a work factor benchmarked in production-like Workers. A pepper, if used, lives only in a Worker secret and is versioned for rotation.
+
+### `account_invitations`
+
+Columns: `id`, `user_id`, `email_snapshot`, `token_digest` (unique), `expires_at`, optional `accepted_at`, optional `revoked_at`, `created_by_user_id`, `created_at`.
+
+Generate at least 32 random bytes with a cryptographically secure generator. Email only an HTTPS URL containing the opaque token. Store only a SHA-256 digest because the token has high entropy. The email shown on the acceptance page comes from the server-side record and is read-only; do not put the email in the URL. A transaction/conditional update makes acceptance single-use.
+
+### `auth_sessions`
+
+Columns: `id`, `user_id`, `token_digest` (unique), `created_at`, `last_seen_at`, `expires_at`, optional `revoked_at`, optional `replaced_by_session_id`, optional `ip_hash`, optional `user_agent_summary`.
+
+The browser receives the opaque token only in a `Secure`, `HttpOnly`, `SameSite=Lax`, path-scoped cookie. Rotate on login and privilege-sensitive events; revoke on logout, password change/reset, user deactivation, and suspected compromise. Store only a digest and enforce absolute plus idle expiry.
+
+### `password_reset_tokens`
+
+Columns: `id`, `user_id`, `token_digest` (unique), `expires_at`, optional `used_at`, optional `revoked_at`, `created_at`.
+
+Use the same high-entropy, digest-only, fixed-origin, single-use rules as invitations. Reset requests return a generic response regardless of whether the account exists.
 
 ### `roles`
 
@@ -126,7 +149,7 @@ Columns: `id`, `meeting_id`, `kind` (`recognition`, `growth_opportunity`, `summa
 
 ### `email_jobs`
 
-Columns: `id`, `job_type` (`feedback_reminder`, `coordinator_report_ready`), `cycle_id`, `recipient_user_id`, `scheduled_for`, `status` (`pending`, `processing`, `sent`, `failed`, `cancelled`), `attempt_count`, `idempotency_key` (unique), optional `provider_message_id`, optional `last_error_code`, optional `last_error_at`, `created_at`, `updated_at`, optional `sent_at`.
+Columns: `id`, `job_type` (`account_invitation`, `password_reset`, `feedback_reminder`, `coordinator_report_ready`), optional `cycle_id`, `recipient_user_id`, `scheduled_for`, `status` (`pending`, `processing`, `sent`, `failed`, `cancelled`), `attempt_count`, `idempotency_key` (unique), optional `provider_message_id`, optional `last_error_code`, optional `last_error_at`, `created_at`, `updated_at`, optional `sent_at`.
 
 Do not store rendered survey content in this table. Errors must be scrubbed of provider payloads that contain personal data.
 
@@ -153,7 +176,7 @@ type EmployeeCycleHistoryItem = {
 
 ## Key indexes and constraints
 
-- Unique stable Entra subject; normalized email lookup.
+- Unique normalized email; one current credential per user; unique invitation/reset/session token digests.
 - Active role, membership, and coordinator assignment indexes.
 - Unique schedule/sequence and participant snapshot keys.
 - Unique submission per participant and email idempotency key.

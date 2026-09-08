@@ -23,12 +23,12 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 - **Why:** Typed relational access and reviewable migrations without hiding SQL/privacy-sensitive query behavior.
 - **Consequences:** Prototype D1 migration/local workflow before final acceptance; privacy aggregate queries may use explicit SQL.
 
-## ADR-004 — Microsoft Entra through Cloudflare Access
+## ADR-004 — Invitation-only password authentication
 
-- **Status:** proposed pending spike
-- **Decision:** Put the internal app behind Cloudflare Access using Microsoft Entra ID, then map the verified identity to an active application user.
-- **Why:** Centralizes internal access and avoids a separate browser OAuth/session implementation for MVP.
-- **Consequences:** Requires Entra/Zero Trust administrative permission. The Worker must verify Access identity and apply its own RBAC. Firebase is the fallback only if the spike shows Access cannot meet requirements.
+- **Status:** accepted, hashing parameters pending spike
+- **Decision:** Admins invite a pre-created user by email. The link carries a single-use opaque token bound server-side to the locked email; the user creates a password and receives a server-managed session. There is no Microsoft login or public signup.
+- **Why:** Keeps onboarding simple and under product control without requiring an organization identity-provider integration.
+- **Consequences:** The application now owns password security, recovery, session lifecycle, abuse prevention, and transactional email reliability. Use digest-only invite/reset/session tokens and secure cookies. Prefer Argon2id if practical on Workers; otherwise use a versioned, benchmarked PBKDF2-HMAC-SHA-256 Web Crypto fallback. MFA is not in MVP but remains a security follow-up.
 
 ## ADR-005 — Multi-role RBAC
 
@@ -100,7 +100,10 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 | Product/People | What Friday is the first anchor, and do holidays postpone or skip a cycle? | Scheduler implementation |
 | Privacy/People | Is threshold `3` sufficient? What happens to teams below it or cycles with organizational changes? | Reporting design |
 | Privacy/Legal | What are the retention/deletion periods for attribution, answers, free text, meeting data, audit, and backups? | Schema production launch |
-| IT | Which Entra tenant/claim is stable, who can register the app, and what MFA/Conditional Access policy applies? | Auth spike |
+| Security/Engineering | Does Argon2id meet security and latency/CPU limits in production-like Workers? If not, what PBKDF2-HMAC-SHA-256 work factor meets the target latency? | Auth spike |
+| Product/Security | What are invitation, reset-token, idle-session, and absolute-session lifetimes? Is Turnstile required at launch? | Auth implementation |
+| Product | Who is the bootstrap administrator, and how is that first account created/recovered securely? | First deployment |
+| Security/Product | Is MFA required for admins at launch? Recommended: yes before broad rollout. | Production review |
 | Product | Can one employee belong to multiple teams and can a team have multiple coordinators simultaneously? | Admin/schema implementation |
 | Product/Privacy | Is feedback submission immutable, editable until close, or withdrawable? | Survey API |
 | Product/Privacy | Are free-text comments shown verbatim, moderated, withheld when identifying, or converted to reviewed themes? | Coordinator reporting |

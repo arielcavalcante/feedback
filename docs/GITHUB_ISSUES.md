@@ -1,6 +1,6 @@
 # Prepared GitHub backlog
 
-The repository includes one body file per issue in `.github/issues/` and an idempotent creation script. After authenticating and publishing the repository, run:
+The idempotent creation script embeds each issue's outcome and acceptance criteria. After authenticating GitHub CLI, run:
 
 ```sh
 ./scripts/create-github-issues.sh
@@ -9,7 +9,7 @@ The repository includes one body file per issue in `.github/issues/` and an idem
 The script creates these issues in dependency-friendly order:
 
 1. Scaffold the Cloudflare React application and CI
-2. Prove Microsoft Entra ID authentication through Cloudflare Access
+2. Implement invitation-only password authentication and sessions
 3. Design D1 schema and Drizzle migrations
 4. Implement application identity and multi-role authorization
 5. Build audit logging and safe observability foundation
@@ -29,4 +29,4 @@ The script creates these issues in dependency-friendly order:
 19. V1.1: Add an employee pre-1:1 agenda
 20. V2: Generate an opt-in recognition share card
 
-Every body contains scope and acceptance criteria. Issue URLs cannot be known until GitHub authentication succeeds and the repository is created.
+Every body contains an outcome and acceptance criteria. The authentication issue covers opaque single-use email invitations, locked server-bound email, password hashing, secure sessions, password reset, rate limiting, and account-enumeration defenses.

@@ -49,9 +49,14 @@ Free text carries re-identification risk even above a numeric threshold.
 
 ## Authentication and authorization
 
-- Cloudflare Access validates Microsoft Entra identity before protected traffic reaches the Worker; the Worker still verifies the trusted Access token/assertion and maps a stable tenant-scoped claim to an active local user.
-- Allow only the approved Entra tenant/domain and require appropriate organization security policy (MFA/Conditional Access as decided by IT).
-- Application RBAC is separate from Access admission. Every API route checks active user, role, team scope, and resource ownership.
+- There is no public signup. An admin creates the user and sends a time-limited invitation to that user's normalized email.
+- Invitation and password-reset URLs contain only a high-entropy opaque token. The server stores its digest, binds it to the user/email, and returns the bound email read-only after validation. The email is not trusted from a URL or form field.
+- Invite/reset tokens are single-use, expire, are revoked by replacement/deactivation, and are consumed with an atomic conditional update. URLs use a fixed allowlisted HTTPS origin and pages set `Referrer-Policy: no-referrer`.
+- Passwords are hashed with a slow, salted, versioned password-hashing scheme—prefer Argon2id after a Worker performance spike, with PBKDF2-HMAC-SHA-256 as the documented Web Crypto fallback. Plaintext passwords never reach logs, analytics, D1, or email providers.
+- Session tokens are cryptographically random, stored only as digests in D1, rotated where appropriate, and delivered only through `Secure`, `HttpOnly`, `SameSite=Lax` cookies. Logout, password reset/change, user deactivation, and compromise revoke applicable sessions.
+- Login, invitation, and reset endpoints use generic responses, rate limiting/backoff, CSRF/origin defenses, and no cache storage. Password managers and paste are supported; common/breached-password screening is evaluated without sending plaintext passwords to another service.
+- Without MFA, require at least 15 characters and support at least 128. Allow Unicode/whitespace, do not silently truncate, impose no composition rules, and do not force periodic changes absent compromise. Require current-password reauthentication for password changes and risk-sensitive actions.
+- Every API route checks the active session, role, team scope, and resource ownership. Browser checks are presentation only.
 - Direct-object-reference tests cover guessed IDs across users, teams, cycles, meetings, and action items.
 - Local-development bypasses use explicit development-only configuration and cannot be enabled in deployed production.
 - Define a break-glass process with time-bounded access and audit review.
@@ -77,7 +82,7 @@ Prefer the shortest useful periods, especially for free text and attribution. A 
 - Database backups/exports are encrypted and access-logged.
 - Monitoring favors counts and reason codes over payloads.
 - Incident response includes containment, access-log review, affected-scope analysis, notification ownership, and credential rotation.
-- Dependency, Worker, D1, Resend, and Access configuration changes receive review appropriate to risk.
+- Dependency, Worker, D1, Resend, password/session, and rate-limit configuration changes receive review appropriate to risk.
 
 ## Threat scenarios and required mitigations
 
@@ -87,7 +92,11 @@ Prefer the shortest useful periods, especially for free text and attribution. A 
 | Two filters reveal one person's answer by subtraction | Central cohort engine; threshold on every projection and comparison; disallow unsafe filters |
 | Admin opens raw-answer endpoint | No ordinary endpoint/capability exists; exceptional access is separate, named, and audited |
 | Browser bundle/query contains hidden attribution | Server-side projection; contract tests and payload inspection |
-| Logs capture a comment or Access token | Structured allowlist logging, redaction, and automated tests |
+| Logs capture a comment, password, or session/invite token | Structured allowlist logging, redaction, and automated tests |
+| Invite URL is edited to claim another email | Token is server-bound to one user/email; email is not accepted from URL/form |
+| Stolen invite/reset URL is replayed | Short expiry, single-use atomic consumption, replacement revocation, no-referrer policy |
+| Password database is stolen | Slow salted versioned hash, optional secret pepper, strong password policy, parameter upgrades |
+| Credential stuffing targets login | Rate limiting/backoff, generic errors, monitoring, optional Turnstile, session revocation |
 | Reminder email reveals participation | Send only to the recipient; generic content; no CC/list; idempotent jobs |
 | Meeting view implies an employee wrote a comment | Only team-level eligible signals; no response selection linked to meeting subject |
 | Membership change rewrites eligibility | Immutable cycle participant snapshot |
@@ -97,9 +106,16 @@ Prefer the shortest useful periods, especially for free text and attribution. A 
 ## Privacy release checklist
 
 - Privacy/legal owner approves notice, purposes, access model, retention, deletion, and investigation procedure.
-- IT approves Entra/Access configuration and stable identity mapping.
+- Security owner approves hashing parameters, invite/reset/session lifetimes, rate limits, cookie/CSRF policy, and recovery procedures.
 - Automated tests cover threshold `n-1`, `n`, and `n+1`, cross-team access, differencing attempts, serialization, and log redaction.
 - Manual inspection confirms coordinator and employee network payloads contain only permitted fields.
 - Small-team behavior and qualitative moderation are tested with realistic scenarios.
 - Production support and database access lists are documented and approved.
 - Participants are told who can access what, how status/reminders work, and where to report a concern.
+
+## Security references
+
+- [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html)
+- [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
+- [OWASP Forgot Password Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html)
+- [Cloudflare Workers Web Crypto](https://developers.cloudflare.com/workers/runtime-apis/web-crypto/)

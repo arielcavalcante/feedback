@@ -13,7 +13,7 @@ Every 14 days, employees receive a short survey about their coordinator, team, a
 - React, TypeScript, and Vite for the web interface.
 - Cloudflare Workers with Static Assets for the web app and API.
 - Cloudflare D1 for relational storage, preferably accessed through Drizzle ORM.
-- Microsoft Entra ID through Cloudflare Access for internal authentication, subject to a short proof of concept.
+- Admin-issued email invitations, password authentication, and server-managed sessions.
 - Resend for MVP transactional email.
 - Cloudflare Cron Triggers as frequent UTC wake-ups. Application/database logic determines whether a Fortaleza-local event is due; cron expressions do not encode the 14-day recurrence.
 
@@ -50,7 +50,7 @@ All persisted instants use UTC. The recurrence anchor and IANA time zone are sto
 
 ## MVP scope
 
-- Entra/Cloudflare Access authentication and application RBAC.
+- Single-use email invitations, safe password storage, session authentication, password reset, and application RBAC.
 - Admin CRUD for users, roles, teams, memberships, coordinator assignments, and activation.
 - D1/Drizzle schema, migrations, seed data, and local development workflow.
 - Biweekly cycle scheduling, survey submission, status-only employee history, reminder/report email jobs, and retry handling.
@@ -75,8 +75,6 @@ All persisted instants use UTC. The recurrence anchor and IANA time zone are sto
 
 - Node.js 22 LTS (pin the exact version when implementation begins) and a package manager such as pnpm.
 - A Cloudflare account and Wrangler CLI access.
-- A Cloudflare Zero Trust organization with permission to configure Access.
-- A Microsoft Entra tenant and permission to create/configure an enterprise application.
 - A Resend account, verified sending domain, and API key.
 - GitHub CLI for publishing and creating the prepared backlog.
 
@@ -87,10 +85,18 @@ During implementation, keep secrets in local environment files excluded by Git a
 Before production deployment, an owner must:
 
 1. Create/select Cloudflare accounts, Worker/D1 resources, environments, and custom domains.
-2. Configure the Entra enterprise application and Cloudflare Access identity provider/policy; decide allowed tenant/domain and break-glass access.
-3. Verify a Resend sending domain and choose sender/reply-to addresses.
-4. Confirm the cycle anchor date, initial team membership, anonymity threshold, retention periods, privacy notice, and named privacy administrators.
+2. Configure the production application origin, session/signing secrets, password pepper, rate limiting, and Turnstile if the auth spike adopts it.
+3. Verify a Resend sending domain and choose sender/reply-to addresses for invitations, password resets, reminders, and reports.
+4. Confirm invite lifetime, session lifetime, password-reset policy, cycle anchor date, initial team membership, anonymity threshold, retention periods, privacy notice, and named privacy administrators.
 5. Configure GitHub environments/secrets, production observability, backups/export policy, and incident ownership.
+
+## Account creation and authentication
+
+There is no public signup. An admin creates a user and sends an invitation email. The invitation URL contains a cryptographically random, single-use opaque token—not the email address. The server stores only the token digest and binds it to the invited user/email. After following the link, the page displays the bound email as read-only and asks the user to create a password.
+
+Passwords are never stored or encrypted reversibly. Prefer Argon2id with OWASP-recommended parameters if a Worker compatibility/performance spike succeeds; otherwise use versioned PBKDF2-HMAC-SHA-256 through Workers Web Crypto with a unique random salt, a production-tuned work factor, and an optional pepper kept in a Worker secret. Sessions use random opaque tokens stored only as digests server-side and sent in `Secure`, `HttpOnly`, `SameSite=Lax` cookies. Invitations and reset tokens expire, are single-use, and are invalidated transactionally.
+
+The invite/reset pages use HTTPS, a fixed allowlisted application origin, `Referrer-Policy: no-referrer`, generic error responses, and rate limiting. Without MFA, the initial policy is at least 15 characters and supports up to at least 128, with Unicode/whitespace and password-manager paste supported, no composition rules, no silent truncation, and no forced periodic changes. Screen common/breached passwords without disclosing plaintext. Revisit MFA for privileged accounts before broad rollout.
 
 ## Planning documents
 
@@ -106,9 +112,7 @@ The local repository is ready to publish, but GitHub authentication must be vali
 
 ```sh
 gh auth login -h github.com
-gh repo create team-feedback --private --source=. --remote=origin --push
 ./scripts/create-github-issues.sh
 ```
 
-Run these commands from the repository root. The script is idempotent by exact issue title and creates labels plus the planned issues.
-# feedback
+Run these commands from the repository root. The repository already exists as `feedback`; the script is idempotent by exact issue title and creates labels plus the planned issues.

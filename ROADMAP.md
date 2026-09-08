@@ -9,15 +9,16 @@ Each phase should leave the system demonstrable and preserve the privacy invaria
 - React/TypeScript/Vite app served by a Cloudflare Worker with Static Assets.
 - Local, preview, and production environment conventions.
 - Minimal CI for type checking, linting, tests, and migration checks.
-- Proof of concept for Entra ID through Cloudflare Access.
-- Written decisions for identity mapping, cycle anchor, retention, and privileged access.
+- Proof of concept for password hashing and session behavior within Worker limits.
+- Written decisions for invite/session/reset lifetimes, password hashing, cycle anchor, retention, and privileged access.
 
 ### Acceptance criteria
 
 - A fresh clone can run locally from documented commands without production credentials.
 - A preview deployment serves the UI and a health endpoint.
 - CI blocks type, lint, unit-test, and migration failures.
-- The auth spike demonstrates a verified identity reaching the Worker, documents local-development bypass rules, and fails closed when identity is absent or invalid.
+- The auth spike benchmarks Argon2id in the deployed Worker runtime; if it is not practical, it benchmarks a versioned PBKDF2-HMAC-SHA-256 fallback and records parameters.
+- A complete preview flow covers admin invite, locked email, password creation, login, session renewal/logout, and password reset with rate limits and generic errors.
 - No product feature implementation is required beyond the vertical slice.
 
 ## Phase 1 — Identity, authorization, and data foundation
@@ -25,7 +26,8 @@ Each phase should leave the system demonstrable and preserve the privacy invaria
 ### Deliverables
 
 - D1 schema and Drizzle migrations for the entities in `docs/DATA_MODEL.md`.
-- Application user resolution from a stable Entra claim.
+- Invite, credential, session, and password-reset persistence with digest-only tokens.
+- Application user resolution from a validated server-side session.
 - Multi-role RBAC enforced in API handlers.
 - Audit event foundation and seeded local fixtures.
 
@@ -36,6 +38,8 @@ Each phase should leave the system demonstrable and preserve the privacy invaria
 - A user with multiple roles can switch capabilities without receiving unauthorized data.
 - Authorization tests deny cross-team access and direct-object-reference attempts.
 - Sensitive administrative and privacy-relevant actions produce append-only audit events without survey content.
+- Used/expired/revoked invitations and reset links cannot create a credential or session.
+- Password and token plaintext never appears in D1, logs, analytics, or email-job records.
 
 ## Phase 2 — Organization administration
 
