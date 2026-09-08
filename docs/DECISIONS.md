@@ -93,6 +93,13 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 - **Why:** It is valuable but not necessary to validate the feedback loop, and it may expose private employment information.
 - **Consequences:** Keep recognition structured enough to support a future card, but build no external posting in MVP.
 
+## ADR-014 — Portfolio color tokens are the product palette
+
+- **Status:** accepted
+- **Decision:** Reuse the nine color tokens from `ariel-portfolio-react` (`ink`, `paper`, `brand-blue`, `light-blue`, `orange`, `brown`, `yellow`, `gold`, and `navy`) as the only authored interface colors. Derived translucent states use `color-mix()` with those tokens.
+- **Why:** Keep the feedback product visually related to the existing portfolio while maintaining one explicit source of truth for color.
+- **Consequences:** New components must use these variables instead of literal colors. Typography, spacing, and component structure are not inherited by this decision.
+
 ## Open questions before implementation/launch
 
 | Owner | Question | Needed by |
