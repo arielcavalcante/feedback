@@ -20,15 +20,15 @@ export default {
         const db = await env.DB.prepare("SELECT 1 AS ok").first<{ ok: number }>();
         return json({ status: db?.ok === 1 ? "ok" : "degraded", service: "feedback", time: new Date().toISOString() });
       }
-      if (request.method === "GET" && url.pathname === "/api/auth/me") return handleMe(request, env);
-      if (request.method === "POST" && url.pathname === "/api/auth/login") return handleLogin(request, env);
-      if (request.method === "POST" && url.pathname === "/api/auth/logout") return handleLogout(request, env);
-      if (request.method === "POST" && url.pathname === "/api/auth/password-reset/request") return handleResetRequest(request, env);
+      if (request.method === "GET" && url.pathname === "/api/auth/me") return await handleMe(request, env);
+      if (request.method === "POST" && url.pathname === "/api/auth/login") return await handleLogin(request, env);
+      if (request.method === "POST" && url.pathname === "/api/auth/logout") return await handleLogout(request, env);
+      if (request.method === "POST" && url.pathname === "/api/auth/password-reset/request") return await handleResetRequest(request, env);
 
-      if (request.method === "POST" && url.pathname === "/api/auth/invitations/resolve") return handleInviteLookup(request, env);
-      if (request.method === "POST" && url.pathname === "/api/auth/invitations/accept") return handleInviteAccept(request, env);
-      if (request.method === "POST" && url.pathname === "/api/auth/password-reset/accept") return handleResetAccept(request, env);
-      if (request.method === "POST" && url.pathname === "/api/admin/invitations") return handleCreateInvitation(request, env);
+      if (request.method === "POST" && url.pathname === "/api/auth/invitations/resolve") return await handleInviteLookup(request, env);
+      if (request.method === "POST" && url.pathname === "/api/auth/invitations/accept") return await handleInviteAccept(request, env);
+      if (request.method === "POST" && url.pathname === "/api/auth/password-reset/accept") return await handleResetAccept(request, env);
+      if (request.method === "POST" && url.pathname === "/api/admin/invitations") return await handleCreateInvitation(request, env);
 
       return json({ error: { code: "not_found", message: "Route not found." } }, { status: 404 });
     } catch (error) {

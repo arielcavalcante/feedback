@@ -38,7 +38,11 @@ Protect a one-time endpoint with a secret and disable it after use. This is the 
 
 The Worker and D1 database are both named `feedback`. The verified D1 ID is configured in `wrangler.jsonc`. Production secrets are `AUTH_PEPPER` and `RESEND_API_KEY`; set these with Wrangler without putting their values in source control. Apply migrations remotely before deploying.
 
-Deployment checkpoint (2026-09-09): both migrations were applied and the Worker was published to `ino.praiasertao.com.br`. An existing zone redirect currently returns HTTP 301 to `https://arielcavalcante.com/` before requests reach the application. Exclude the exact hostname `ino.praiasertao.com.br` from the matching redirect rule while preserving other hosts. Wrangler OAuth lacks access to the zone rulesets/page rules. Domain smoke testing and the first administrator invitation remain pending this correction; email delivery has not yet been verified. The bootstrap administrator has been provisioned without credentials, so issue an invitation for the existing user rather than rerunning the insert-only bootstrap command.
+Deployment checkpoint (2026-09-09): both migrations were applied and the Worker was published to `ino.praiasertao.com.br`. The owner corrected the zone redirect; the health endpoint now returns HTTP 200 with D1 connected. Resend accepted the first administrator invitation. The recipient must open the email to set their own password; provider acceptance is not confirmation of inbox delivery.
+
+For an existing bootstrap administrator without a password, an operator with D1 write authority can run `node scripts/send-bootstrap-invite.mjs admin@example.com`. It uses the existing invitation API through a five-minute operator session, keeps raw tokens in memory only, and revokes the session in a finally block. Do not rerun the insert-only bootstrap command for an existing user.
+
+The owner approved 100,000 PBKDF2-HMAC-SHA256 iterations for the six-person MVP, with a required `AUTH_PEPPER` secret and random per-password salt. Workers rejected 600,000 iterations through both available crypto APIs. Future improvements and migration are tracked in issue #21.
 
 ## 6. Feedback schedule and holidays
 

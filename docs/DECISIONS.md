@@ -102,6 +102,10 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 
 ## Open questions before implementation/launch
 
+### MVP password work factor exception — accepted 2026-09-09
+
+The owner explicitly approved PBKDF2-HMAC-SHA256 with 100,000 iterations for the six-person production MVP. Both Workers Web Crypto and node:crypto reject the originally planned 600,000 iterations. Use a unique random salt, a required secret pepper, versioned hashes, existing rate limits, and the 15-character password policy. This is a lower work factor than the original target, not an equivalent-strength replacement. Benchmarking, algorithm upgrades, and migration are tracked in [issue #21](https://github.com/arielcavalcante/feedback/issues/21). No existing production password hashes need migration at this checkpoint.
+
 | Owner | Question | Needed by |
 |---|---|---|
 | Product/People | What Friday is the first anchor, and do holidays postpone or skip a cycle? | Scheduler implementation |
