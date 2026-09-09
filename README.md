@@ -93,7 +93,7 @@ Run `pnpm check` before committing. It type-checks, tests, validates Drizzle mig
 
 The production build temporarily excludes `.dev.vars` and scans `dist` for secret files/markers before succeeding. `pnpm preview` follows Cloudflare's local-preview behavior and may copy `.dev.vars` into ignored build output; Cloudflare documents that this preview copy is not deployed.
 
-The D1 ID in `wrangler.jsonc` is intentionally a placeholder until Wrangler is reauthenticated and the already-created remote database is positively identified.
+The verified production D1 ID is configured in `wrangler.jsonc`. The application origin is `https://ino.praiasertao.com.br`; production secrets are `AUTH_PEPPER` and `RESEND_API_KEY`.
 
 ## Deployment prerequisites
 

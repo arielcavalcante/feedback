@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const forbiddenNames = new Set([".dev.vars", ".env", ".env.local"]);
-const forbiddenPatterns = [/PASSWORD_PEPPER\s*=/, /RESEND_API_KEY\s*=/, /BEGIN (?:RSA |EC )?PRIVATE KEY/];
+const forbiddenPatterns = [/(?:AUTH|PASSWORD)_PEPPER\s*=/, /RESEND_API_KEY\s*=/, /BEGIN (?:RSA |EC )?PRIVATE KEY/];
 const failures = [];
 
 function walk(directory) {

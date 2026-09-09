@@ -57,7 +57,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   const row = await env.DB.prepare(`SELECT u.id, u.email, u.display_name AS displayName, u.is_active AS isActive, c.password_hash AS passwordHash
     FROM users u JOIN auth_credentials c ON c.user_id = u.id WHERE u.email = ?`).bind(email).first<{ id: string; email: string; displayName: string; isActive: number; passwordHash: string }>();
   const iterations = passwordIterations(env);
-  const valid = row ? await verifyPassword(body.password, row.passwordHash, env.PASSWORD_PEPPER) : await consumePasswordWork(body.password, env, iterations);
+  const valid = row ? await verifyPassword(body.password, row.passwordHash, env.AUTH_PEPPER) : await consumePasswordWork(body.password, env, iterations);
   if (!row || !row.isActive || !valid) throw new HttpError(401, "invalid_credentials", API_ERROR);
   await clearAuthLimit(env, "login", email);
   const user = await userWithRoles(env, row.id);
@@ -68,7 +68,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
 
 async function consumePasswordWork(password: string, env: Env, iterations: number): Promise<false> {
   const safeInput = password.length >= 15 && password.length <= 128 ? password : "invalid-password-placeholder";
-  await hashPassword(safeInput, env.PASSWORD_PEPPER, iterations);
+  await hashPassword(safeInput, env.AUTH_PEPPER, iterations);
   return false;
 }
 
@@ -95,7 +95,7 @@ async function handleInviteAccept(request: Request, env: Env): Promise<Response>
   const invitation = await validInvitation(env, token);
   if (!invitation) throw new HttpError(404, "invitation_unavailable", "This invitation is invalid or has expired.");
   const now = new Date().toISOString();
-  const passwordHash = await hashPassword(body.password, env.PASSWORD_PEPPER, passwordIterations(env));
+  const passwordHash = await hashPassword(body.password, env.AUTH_PEPPER, passwordIterations(env));
   const digest = await digestToken(token);
   const result = await env.DB.batch([
     env.DB.prepare(`INSERT INTO auth_credentials (user_id, password_hash, password_changed_at, must_change_password, created_at, updated_at)
@@ -172,7 +172,7 @@ async function handleResetAccept(request: Request, env: Env): Promise<Response> 
   const reset = await env.DB.prepare(`SELECT user_id AS userId FROM password_reset_tokens
     WHERE token_digest = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?`).bind(digest, now).first<{ userId: string }>();
   if (!reset) throw new HttpError(404, "reset_unavailable", "This reset link is invalid or has expired.");
-  const passwordHash = await hashPassword(body.password, env.PASSWORD_PEPPER, passwordIterations(env));
+  const passwordHash = await hashPassword(body.password, env.AUTH_PEPPER, passwordIterations(env));
   const results = await env.DB.batch([
     env.DB.prepare(`UPDATE auth_credentials SET password_hash = ?, password_changed_at = ?, updated_at = ? WHERE user_id = ?
       AND EXISTS (SELECT 1 FROM password_reset_tokens WHERE token_digest = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?)`).bind(passwordHash, now, now, reset.userId, digest, now),

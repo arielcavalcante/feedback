@@ -1,39 +1,40 @@
 {
-  "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "feedback",
-  "compatibility_date": "2026-09-08",
-  "main": "./worker/index.ts",
-  "assets": {
-    "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
-  },
-  "routes": [
-    {
-      "pattern": "feedback.praiasertao.com.br",
-      "custom_domain": true
-    }
-  ],
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "feedback",
-      "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "drizzle"
-    }
-  ],
-  "triggers": {
-    "crons": ["*/15 * * * *"]
-  },
-  "vars": {
-    "APP_ORIGIN": "https://feedback.praiasertao.com.br",
-    "APP_ENV": "production",
-    "SESSION_IDLE_DAYS": "7",
-    "SESSION_ABSOLUTE_DAYS": "30",
-    "INVITATION_TTL_HOURS": "48",
-    "PASSWORD_RESET_TTL_MINUTES": "30",
-    "PASSWORD_PBKDF2_ITERATIONS": "600000"
-  },
-  "observability": {
-    "enabled": true
-  }
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "feedback",
+	"compatibility_date": "2026-09-08",
+	"main": "./worker/index.ts",
+	"assets": {
+		"not_found_handling": "single-page-application",
+		"run_worker_first": ["/api/*"],
+	},
+	"routes": [
+		{
+			"pattern": "ino.praiasertao.com.br",
+			"custom_domain": true,
+		},
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "feedback",
+			"database_id": "18f7a856-ec3d-4cc8-b37d-d12b1374eafb",
+			"migrations_dir": "drizzle",
+		},
+	],
+	"triggers": {
+		"crons": ["*/15 * * * *"],
+	},
+	"vars": {
+		"APP_ORIGIN": "https://ino.praiasertao.com.br",
+		"EMAIL_FROM": "Feedback <ino@mail.praiasertao.com.br>",
+		"APP_ENV": "production",
+		"SESSION_IDLE_DAYS": "7",
+		"SESSION_ABSOLUTE_DAYS": "30",
+		"INVITATION_TTL_HOURS": "48",
+		"PASSWORD_RESET_TTL_MINUTES": "30",
+		"PASSWORD_PBKDF2_ITERATIONS": "600000",
+	},
+	"observability": {
+		"enabled": true,
+	},
 }

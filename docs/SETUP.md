@@ -8,7 +8,7 @@ The application needs two Worker secrets/variables: `RESEND_API_KEY` and `EMAIL_
 
 ## 2. Production URL
 
-Accepted: `https://feedback.praiasertao.com.br`. It is configured as the application origin and proposed Worker custom domain in `wrangler.jsonc`. Invitation/reset links must always use this fixed origin, never a request `Host` header.
+Accepted: `https://ino.praiasertao.com.br`. It is configured as the application origin and Worker custom domain in `wrangler.jsonc`. Invitation/reset links must always use this fixed origin, never a request `Host` header. The sender is `Feedback <ino@mail.praiasertao.com.br>`.
 
 ## 3. Bootstrap administrator choices
 
@@ -36,7 +36,9 @@ Protect a one-time endpoint with a secret and disable it after use. This is the 
 
 ## 5. Cloudflare resources
 
-The Worker and D1 database already exist. Replace the placeholder D1 ID in `wrangler.jsonc`, authenticate Wrangler, apply migrations remotely, set secrets, then deploy. Do not run remote migrations until the D1 target has been verified by name and ID.
+The Worker and D1 database are both named `feedback`. The verified D1 ID is configured in `wrangler.jsonc`. Production secrets are `AUTH_PEPPER` and `RESEND_API_KEY`; set these with Wrangler without putting their values in source control. Apply migrations remotely before deploying.
+
+Deployment checkpoint (2026-09-09): both migrations were applied and the Worker was published to `ino.praiasertao.com.br`. An existing zone redirect currently returns HTTP 301 to `https://arielcavalcante.com/` before requests reach the application. Exclude the exact hostname `ino.praiasertao.com.br` from the matching redirect rule while preserving other hosts. Wrangler OAuth lacks access to the zone rulesets/page rules. Domain smoke testing and the first administrator invitation remain pending this correction; email delivery has not yet been verified. The bootstrap administrator has been provisioned without credentials, so issue an invitation for the existing user rather than rerunning the insert-only bootstrap command.
 
 ## 6. Feedback schedule and holidays
 

@@ -4,8 +4,8 @@ import { digestToken } from "./crypto";
 export async function consumeAuthLimit(request: Request, env: Env, action: string, identity: string, limit = 10, windowSeconds = 900): Promise<boolean> {
   const ip = request.headers.get("CF-Connecting-IP") ?? "local";
   const keys = await Promise.all([
-    digestToken(`${env.PASSWORD_PEPPER}|identity|${identity}`),
-    digestToken(`${env.PASSWORD_PEPPER}|ip|${ip}`),
+    digestToken(`${env.AUTH_PEPPER}|identity|${identity}`),
+    digestToken(`${env.AUTH_PEPPER}|ip|${ip}`),
   ]);
   const now = new Date();
   const windowStart = new Date(now.getTime() - windowSeconds * 1000).toISOString();
@@ -25,6 +25,6 @@ export async function consumeAuthLimit(request: Request, env: Env, action: strin
 }
 
 export async function clearAuthLimit(env: Env, action: string, identity: string): Promise<void> {
-  const key = await digestToken(`${env.PASSWORD_PEPPER}|identity|${identity}`);
+  const key = await digestToken(`${env.AUTH_PEPPER}|identity|${identity}`);
   await env.DB.prepare("DELETE FROM auth_rate_limits WHERE key_hash = ? AND action = ?").bind(key, action).run();
 }

@@ -2,7 +2,7 @@ export interface Env {
   DB: D1Database;
   APP_ORIGIN: string;
   APP_ENV: "local" | "preview" | "production";
-  PASSWORD_PEPPER: string;
+  AUTH_PEPPER: string;
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
   SESSION_IDLE_DAYS: string;

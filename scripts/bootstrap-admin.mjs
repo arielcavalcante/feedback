@@ -28,5 +28,5 @@ VALUES (${quote(invitationId)}, ${quote(userId)}, ${quote(email)}, ${quote(diges
 
 execFileSync("pnpm", ["exec", "wrangler", "d1", "execute", "feedback", remote ? "--remote" : "--local", "--command", sql], { stdio: "inherit" });
 console.log("\nOpen this one-time invitation link privately. It is shown only once:\n");
-console.log(`https://feedback.praiasertao.com.br/accept-invite#token=${token}`);
+console.log(`https://ino.praiasertao.com.br/accept-invite#token=${token}`);
 console.log(`\nExpires: ${expiresAt}`);
