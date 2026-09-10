@@ -260,6 +260,7 @@ function AcceptInvite({ token, onAccepted }: { token?: string; onAccepted: (user
 }
 
 function Home({ user, error }: { user: CurrentUser; error: string }) {
+  if (user.roles.includes("employee")) return <EmployeeHome user={user} logoutError={error} />;
   const { t } = useLocale();
   return (
     <main id="main-content" className="home page-width">
@@ -272,6 +273,130 @@ function Home({ user, error }: { user: CurrentUser; error: string }) {
       </section>
     </main>
   );
+}
+
+type EmployeeDashboardData = {
+  activeCycle: null | { id: string; opensAt: string; closesAt: string; teamName: string; coordinatorName: string };
+  history: Array<{ cycleId: string; opensAt: string; status: "done" | "skipped" }>;
+};
+
+function EmployeeHome({ user, logoutError }: { user: CurrentUser; logoutError: string }) {
+  const { t, locale } = useLocale();
+  const [dashboard, setDashboard] = useState<EmployeeDashboardData | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [surveyOpen, setSurveyOpen] = useState(false);
+  const [ratings, setRatings] = useState({ coordinator: 0, team: 0, work: 0 });
+  const [comment, setComment] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  async function loadDashboard() {
+    try {
+      setDashboard(await api<EmployeeDashboardData>("/api/employee/dashboard"));
+      setLoadError("");
+    } catch (caught) {
+      setLoadError(errorText(caught, "Unable to load your feedback space."));
+    }
+  }
+
+  useEffect(() => { void loadDashboard(); }, []);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!dashboard?.activeCycle) return;
+    setBusy(true);
+    setLoadError("");
+    try {
+      await api("/api/employee/feedback", {
+        method: "POST",
+        body: JSON.stringify({ cycleId: dashboard.activeCycle.id, ...ratings, comment }),
+      });
+      setSubmitted(true);
+      setSurveyOpen(false);
+      await loadDashboard();
+    } catch (caught) {
+      setLoadError(errorText(caught, "Unable to send your feedback."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const date = (value: string, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(locale === "en" ? "en-US" : "pt-BR", {
+    timeZone: "America/Fortaleza", ...options,
+  }).format(new Date(value));
+  const firstName = user.displayName.trim().split(/\s+/)[0];
+
+  return (
+    <main id="main-content" className="employee-dashboard page-width">
+      <section className="employee-hero">
+        <p className="availability"><span className="availability__dot" aria-hidden="true" />{t(dashboard?.activeCycle ? "Feedback open today" : "Your feedback space")}</p>
+        <h1>{t("Hello, {name}", { name: firstName })}</h1>
+        <p>{t("A few honest minutes today can make the next conversation better.")}</p>
+      </section>
+
+      <div className="employee-layout">
+        <section className="active-feedback" aria-labelledby="active-feedback-title">
+          {submitted && <p className="success" role="status">{t("Feedback sent. Thank you for taking the time.")}</p>}
+          {!dashboard ? (
+            <p role="status">{t("Loading your feedback cycles…")}</p>
+          ) : dashboard.activeCycle ? (
+            <>
+              <div className="section-heading">
+                <div><p className="eyebrow">{t("Today")}</p><h2 id="active-feedback-title">{t("Your feedback is waiting")}</h2></div>
+                <span className="status-pill status-pill--pending">{t("Pending")}</span>
+              </div>
+              <p className="active-feedback__intro">{t("Think about the last two weeks. Your answers are confidential and shown only in anonymous group results.")}</p>
+              <dl className="cycle-meta">
+                <div><dt>{t("Team")}</dt><dd>{dashboard.activeCycle.teamName}</dd></div>
+                <div><dt>{t("Coordinator")}</dt><dd>{dashboard.activeCycle.coordinatorName}</dd></div>
+                <div><dt>{t("Closes")}</dt><dd>{date(dashboard.activeCycle.closesAt, { weekday: "long", hour: "2-digit", minute: "2-digit" })}</dd></div>
+              </dl>
+              {!surveyOpen ? (
+                <button className="case-link primary dashboard-action" onClick={() => setSurveyOpen(true)}>
+                  <span>{t("Answer now")}</span><span className="case-link__icon" aria-hidden="true" />
+                </button>
+              ) : (
+                <form className="survey-form" onSubmit={submit}>
+                  <p className="survey-form__hint">{t("1 means very dissatisfied; 5 means very satisfied.")}</p>
+                  <RatingField label={t("How do you feel about your coordinator?")} value={ratings.coordinator} onChange={(value) => setRatings({ ...ratings, coordinator: value })} />
+                  <RatingField label={t("How do you feel about your team?")} value={ratings.team} onChange={(value) => setRatings({ ...ratings, team: value })} />
+                  <RatingField label={t("How do you feel about your work?")} value={ratings.work} onChange={(value) => setRatings({ ...ratings, work: value })} />
+                  <label className="comment-field"><span>{t("Anything else you’d like to share? (optional)")}</span><textarea value={comment} maxLength={2000} onChange={(event) => setComment(event.target.value)} /></label>
+                  <ErrorMessage message={loadError} />
+                  <Primary busy={busy} disabled={Object.values(ratings).some((rating) => rating === 0)}>{t(busy ? "Sending feedback…" : "Send feedback")}</Primary>
+                  <button type="button" className="text-button align-left" onClick={() => setSurveyOpen(false)}>{t("Answer later")}</button>
+                </form>
+              )}
+            </>
+          ) : (
+            <div className="all-done"><span className="all-done__mark" aria-hidden="true">✓</span><div><p className="eyebrow">{t("All done")}</p><h2 id="active-feedback-title">{t("Nothing pending today")}</h2><p>{t("We’ll let you know when the next feedback cycle opens.")}</p></div></div>
+          )}
+          {!surveyOpen && <ErrorMessage message={loadError || logoutError} />}
+        </section>
+
+        <section className="cycle-history" aria-labelledby="history-title">
+          <div className="section-heading">
+            <div><p className="eyebrow">{t("History")}</p><h2 id="history-title">{t("Your participation")}</h2></div>
+            <strong>{dashboard ? t("{count} completed", { count: String(dashboard.history.filter((cycle) => cycle.status === "done").length) }) : "—"}</strong>
+          </div>
+          <p>{t("We only show whether you participated. Your answers and scores never appear here.")}</p>
+          <div className="cycle-grid" aria-label={t("Past feedback cycles")}>
+            {dashboard?.history.map((cycle) => (
+              <article className={`cycle-square cycle-square--${cycle.status}`} key={cycle.cycleId} aria-label={`${date(cycle.opensAt, { dateStyle: "long" })}: ${t(cycle.status)}`}>
+                <span className="cycle-square__mark" aria-hidden="true">{cycle.status === "done" ? "✓" : "–"}</span>
+                <time dateTime={cycle.opensAt}>{date(cycle.opensAt, { day: "2-digit", month: "short" })}</time>
+                <span>{t(cycle.status)}</span>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function RatingField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+  return <fieldset className="rating-field"><legend>{label}</legend><div>{[1, 2, 3, 4, 5].map((rating) => <label key={rating} className={value === rating ? "is-selected" : ""}><input type="radio" name={label} value={rating} checked={value === rating} onChange={() => onChange(rating)} required /><span>{rating}</span></label>)}</div></fieldset>;
 }
 
 function Field(props: {

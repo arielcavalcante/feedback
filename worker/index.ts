@@ -31,6 +31,8 @@ export default {
       if (request.method === "POST" && url.pathname === "/api/auth/invitations/accept") return await handleInviteAccept(request, env);
       if (request.method === "POST" && url.pathname === "/api/auth/password-reset/accept") return await handleResetAccept(request, env);
       if (request.method === "POST" && url.pathname === "/api/admin/invitations") return await handleCreateInvitation(request, env);
+      if (request.method === "GET" && url.pathname === "/api/employee/dashboard") return await handleEmployeeDashboard(request, env);
+      if (request.method === "POST" && url.pathname === "/api/employee/feedback") return await handleEmployeeFeedback(request, env);
 
       return json({ error: { code: "not_found", message: translate("Route not found.", locale) } }, { status: 404 });
     } catch (error) {
@@ -201,6 +203,91 @@ async function handleResetAccept(request: Request, env: Env): Promise<Response> 
   ]);
   if ((results[0].meta.changes ?? 0) !== 1 || (results[1].meta.changes ?? 0) !== 1) throw new HttpError(409, "reset_unavailable", "This reset link is invalid or has already been used.");
   return json({ ok: true });
+}
+
+type EmployeeCycleRow = {
+  cycleId: string;
+  opensAt: string;
+  closesAt: string;
+  cycleStatus: string;
+  teamName: string;
+  coordinatorName: string;
+  submissionId: string | null;
+};
+
+async function handleEmployeeDashboard(request: Request, env: Env): Promise<Response> {
+  const user = await requireRole(request, env, "employee");
+  const now = new Date().toISOString();
+  const rows = await env.DB.prepare(`SELECT c.id AS cycleId, c.opens_at AS opensAt, c.closes_at AS closesAt,
+      c.status AS cycleStatus, t.name AS teamName, coordinator.display_name AS coordinatorName,
+      s.id AS submissionId
+    FROM feedback_cycle_participants participant
+    JOIN feedback_cycles c ON c.id = participant.cycle_id
+    JOIN teams t ON t.id = participant.team_id
+    JOIN users coordinator ON coordinator.id = participant.coordinator_user_id
+    LEFT JOIN feedback_submissions s ON s.participant_id = participant.id AND s.state = 'submitted'
+    WHERE participant.employee_user_id = ? AND participant.eligibility_status = 'eligible'
+      AND c.status != 'cancelled' AND c.opens_at <= ?
+    ORDER BY c.opens_at DESC`).bind(user.id, now).all<EmployeeCycleRow>();
+
+  const activeRow = rows.results.find((row) => row.cycleStatus === "open" && row.opensAt <= now && row.closesAt > now && !row.submissionId);
+  const history = rows.results
+    .filter((row) => row.closesAt <= now || row.cycleStatus === "closed" || row.cycleStatus === "reported")
+    .map((row) => ({ cycleId: row.cycleId, opensAt: row.opensAt, status: row.submissionId ? "done" as const : "skipped" as const }));
+
+  return json({
+    activeCycle: activeRow ? {
+      id: activeRow.cycleId,
+      opensAt: activeRow.opensAt,
+      closesAt: activeRow.closesAt,
+      teamName: activeRow.teamName,
+      coordinatorName: activeRow.coordinatorName,
+    } : null,
+    history,
+  });
+}
+
+async function handleEmployeeFeedback(request: Request, env: Env): Promise<Response> {
+  const user = await requireRole(request, env, "employee");
+  const body = await readJson<{ cycleId?: unknown; coordinator?: unknown; team?: unknown; work?: unknown; comment?: unknown }>(request, 12_000);
+  if (typeof body.cycleId !== "string") throw new HttpError(400, "invalid_feedback", "Choose an active feedback cycle.");
+  const ratings = [body.coordinator, body.team, body.work];
+  if (!ratings.every((rating) => Number.isInteger(rating) && Number(rating) >= 1 && Number(rating) <= 5)) {
+    throw new HttpError(400, "invalid_feedback", "Rate every feedback area from 1 to 5.");
+  }
+  if (body.comment !== undefined && (typeof body.comment !== "string" || body.comment.length > 2_000)) {
+    throw new HttpError(400, "invalid_feedback", "The optional comment must have no more than 2,000 characters.");
+  }
+
+  const now = new Date().toISOString();
+  const participant = await env.DB.prepare(`SELECT participant.id
+    FROM feedback_cycle_participants participant
+    JOIN feedback_cycles cycle ON cycle.id = participant.cycle_id
+    WHERE participant.employee_user_id = ? AND participant.cycle_id = ?
+      AND participant.eligibility_status = 'eligible' AND cycle.status = 'open'
+      AND cycle.opens_at <= ? AND cycle.closes_at > ?`).bind(user.id, body.cycleId, now, now).first<{ id: string }>();
+  if (!participant) throw new HttpError(404, "feedback_unavailable", "This feedback cycle is not available.");
+  const existing = await env.DB.prepare("SELECT id FROM feedback_submissions WHERE participant_id = ?").bind(participant.id).first<{ id: string }>();
+  if (existing) throw new HttpError(409, "feedback_submitted", "You already completed this feedback cycle.");
+
+  const submissionId = crypto.randomUUID();
+  const answers = [
+    { dimension: "coordinator", questionKey: "coordinator_csat", value: Number(body.coordinator) },
+    { dimension: "team", questionKey: "team_csat", value: Number(body.team) },
+    { dimension: "work", questionKey: "work_csat", value: Number(body.work) },
+  ];
+  const statements = [
+    env.DB.prepare("INSERT INTO feedback_submissions (id, cycle_id, participant_id, submitted_at, state, schema_version, created_at) VALUES (?, ?, ?, ?, 'submitted', 1, ?)")
+      .bind(submissionId, body.cycleId, participant.id, now, now),
+    ...answers.map((answer) => env.DB.prepare("INSERT INTO feedback_answers (id, submission_id, dimension, question_key, numeric_value, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(crypto.randomUUID(), submissionId, answer.dimension, answer.questionKey, answer.value, now)),
+  ];
+  const comment = typeof body.comment === "string" ? body.comment.trim() : "";
+  if (comment) statements.push(env.DB.prepare("INSERT INTO feedback_answers (id, submission_id, dimension, question_key, text_value, created_at) VALUES (?, ?, 'work', 'optional_comment', ?, ?)")
+    .bind(crypto.randomUUID(), submissionId, comment, now));
+  await env.DB.batch(statements);
+  await audit(env, user.id, "feedback.submitted", "feedback_submission", submissionId, "success");
+  return json({ ok: true }, { status: 201 });
 }
 
 async function validInvitation(env: Env, token: string) {
