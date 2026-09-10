@@ -6,11 +6,13 @@ import { clearSessionCookie, createSession, currentUser, readCookie, SESSION_COO
 import { sendAccountEmail } from "./email";
 import { assertSameOrigin, HttpError, json, readJson } from "./http";
 import { runScheduler } from "./scheduler/run";
+import { formatDate, requestLocale, translate } from "../shared/localization";
 
 const API_ERROR = "The email or password is incorrect.";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const locale = requestLocale(request);
     try {
       const url = new URL(request.url);
       if (!url.pathname.startsWith("/api/")) return new Response("Not found", { status: 404 });
@@ -30,12 +32,12 @@ export default {
       if (request.method === "POST" && url.pathname === "/api/auth/password-reset/accept") return await handleResetAccept(request, env);
       if (request.method === "POST" && url.pathname === "/api/admin/invitations") return await handleCreateInvitation(request, env);
 
-      return json({ error: { code: "not_found", message: "Route not found." } }, { status: 404 });
+      return json({ error: { code: "not_found", message: translate("Route not found.", locale) } }, { status: 404 });
     } catch (error) {
-      if (error instanceof HttpError) return json({ error: { code: error.code, message: error.message } }, { status: error.status });
+      if (error instanceof HttpError) return json({ error: { code: error.code, message: translate(error.message, locale) } }, { status: error.status });
       const requestId = crypto.randomUUID();
       console.error(JSON.stringify({ event: "request_failed", requestId, error: error instanceof Error ? error.message : "unknown" }));
-      return json({ error: { code: "internal_error", message: "Something went wrong.", requestId } }, { status: 500 });
+      return json({ error: { code: "internal_error", message: translate("Something went wrong.", locale), requestId } }, { status: 500 });
     }
   },
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
@@ -112,6 +114,7 @@ async function handleInviteAccept(request: Request, env: Env): Promise<Response>
 }
 
 async function handleCreateInvitation(request: Request, env: Env): Promise<Response> {
+  const locale = requestLocale(request);
   const actor = await requireRole(request, env, "admin");
   const body = await readJson<{ email?: unknown; displayName?: unknown; roles?: unknown }>(request);
   if (typeof body.email !== "string" || typeof body.displayName !== "string" || !Array.isArray(body.roles)) throw new HttpError(400, "invalid_user", "Provide an email, name, and roles.");
@@ -136,12 +139,21 @@ async function handleCreateInvitation(request: Request, env: Env): Promise<Respo
   ];
   await env.DB.batch(statements);
   const actionUrl = `${env.APP_ORIGIN}/accept-invite#token=${encodeURIComponent(token)}`;
-  await sendAccountEmail(env, { to: email, subject: "You’re invited to Team Feedback", heading: `Welcome, ${body.displayName.trim()}`, body: `Create your account before ${expiresAt}.`, actionLabel: "Create account", actionUrl });
+  await sendAccountEmail(env, {
+    to: email,
+    locale,
+    subject: translate("You’re invited to Team Feedback", locale),
+    heading: translate("Welcome, {name}", locale, { name: body.displayName.trim() }),
+    body: translate("Create your account before {date}.", locale, { date: formatDate(expiresAt, locale) }),
+    actionLabel: translate("Create account", locale),
+    actionUrl,
+  });
   await audit(env, actor.id, "account.invitation_created", "user", userId, "success");
   return json({ invitation: { userId, email, expiresAt, ...(env.APP_ENV === "local" ? { actionUrl } : {}) } }, { status: 201 });
 }
 
 async function handleResetRequest(request: Request, env: Env): Promise<Response> {
+  const locale = requestLocale(request);
   const body = await readJson<{ email?: unknown }>(request);
   if (typeof body.email === "string") {
     const email = normalizeEmail(body.email);
@@ -155,7 +167,15 @@ async function handleResetRequest(request: Request, env: Env): Promise<Response>
         env.DB.prepare("INSERT INTO password_reset_tokens (id, user_id, token_digest, expires_at, created_at) VALUES (?, ?, ?, ?, ?)").bind(crypto.randomUUID(), user.id, digest, expiresAt, now.toISOString()),
       ]);
       const actionUrl = `${env.APP_ORIGIN}/reset-password#token=${encodeURIComponent(token)}`;
-      await sendAccountEmail(env, { to: user.email, subject: "Reset your Team Feedback password", heading: "Reset your password", body: `This link expires at ${expiresAt}.`, actionLabel: "Reset password", actionUrl }).catch((error) => {
+      await sendAccountEmail(env, {
+        to: user.email,
+        locale,
+        subject: translate("Reset your Team Feedback password", locale),
+        heading: translate("Reset your password", locale),
+        body: translate("This link expires at {date}.", locale, { date: formatDate(expiresAt, locale) }),
+        actionLabel: translate("Reset password", locale),
+        actionUrl,
+      }).catch((error) => {
         console.error(JSON.stringify({ event: "password_reset_delivery_failed", code: error instanceof Error ? error.message : "unknown" }));
       });
     }

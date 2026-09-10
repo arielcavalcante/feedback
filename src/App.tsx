@@ -1,22 +1,27 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useId, useState } from "react";
 import { api, type CurrentUser } from "./api";
+import { useLocale } from "./i18n";
+import { SiteHeader } from "./components/SiteHeader";
 
-type Invite = { email: string; displayName: string; expiresAt: string };
-type View = "login" | "invite" | "reset" | "home";
-
-function currentRoute(): { view: View; token?: string } {
+function currentRoute() {
   const url = new URL(window.location.href);
   const token = new URLSearchParams(url.hash.slice(1)).get("token") ?? url.searchParams.get("token") ?? undefined;
-  if (url.pathname === "/accept-invite" || url.pathname === "/reset-password") window.history.replaceState({}, "", url.pathname);
-  if (url.pathname === "/accept-invite") return { view: "invite", token };
-  if (url.pathname === "/reset-password") return { view: "reset", token };
-  return { view: "login" };
+  const view = url.pathname === "/accept-invite" ? "invite" : url.pathname === "/reset-password" ? "reset" : "login";
+  if (view !== "login") {
+    url.hash = "";
+    url.searchParams.delete("token");
+    window.history.replaceState({}, "", url.pathname + url.search);
+  }
+  return { view, token };
 }
+const route = currentRoute();
+type Invite = { email: string; displayName: string; expiresAt: string };
 
 export function App() {
-  const route = useMemo(currentRoute, []);
+  const { t, locale } = useLocale();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [checking, setChecking] = useState(true);
+  const [logoutError, setLogoutError] = useState("");
 
   useEffect(() => {
     api<{ user: CurrentUser }>("/api/auth/me")
@@ -25,29 +30,56 @@ export function App() {
       .finally(() => setChecking(false));
   }, []);
 
-  if (checking) return <CenteredMessage>Preparing your workspace…</CenteredMessage>;
-  if (user) return <Home user={user} />;
-  if (route.view === "invite") return <AcceptInvite token={route.token} onAccepted={setUser} />;
-  if (route.view === "reset") return <ResetPassword token={route.token} />;
-  return <Login onLogin={setUser} />;
+  async function logout() {
+    try {
+      await api("/api/auth/logout", { method: "POST", body: "{}" });
+      window.location.assign(`/?lang=${locale}`);
+    } catch {
+      setLogoutError("Something went wrong. Please try again.");
+    }
+  }
+
+  return (
+    <div className="page-shell">
+      <a className="skip-link" href="#main-content">{t("Skip to content")}</a>
+      <SiteHeader signedIn={Boolean(user)} onSignOut={logout} />
+      {checking ? (
+        <main id="main-content" className="centered"><p role="status">{t("Preparing your workspace…")}</p></main>
+      ) : user ? (
+        <Home user={user} error={logoutError} />
+      ) : route.view === "invite" ? (
+        <AcceptInvite token={route.token} onAccepted={setUser} />
+      ) : route.view === "reset" ? (
+        <ResetPassword token={route.token} />
+      ) : (
+        <Login onLogin={setUser} />
+      )}
+      <footer className="site-footer" id="privacy" tabIndex={-1}>
+        <div className="site-footer__inner page-width">
+          <p>{t("Feedback, with care.")}</p>
+          <p className="privacy-note"><span className="shell-icon" aria-hidden="true" />{t("Survey responses are anonymous to coordinators and teammates.")}</p>
+        </div>
+      </footer>
+    </div>
+  );
 }
 
-function Shell({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
+function Shell({ eyebrow, title, children }: { eyebrow: string; title: string; children: ReactNode }) {
+  const { t } = useLocale();
   return (
-    <main className="shell">
-      <section className="brand-panel" aria-label="About Team Feedback">
-        <div className="mark" aria-hidden="true"><span /><span /><span /></div>
-        <div>
-          <p className="eyebrow">A healthier feedback rhythm</p>
-          <h1>Small signals.<br />Better conversations.</h1>
-          <p className="brand-copy">Private, recurring feedback designed to help teams talk honestly and act thoughtfully.</p>
+    <main id="main-content" className="shell page-width">
+      <section className="brand-panel" aria-label={t("About Team Feedback")}>
+        <p className="availability"><span className="availability__dot" aria-hidden="true" />{t("A healthier feedback rhythm")}</p>
+        <div className="brand-title">
+          <h1><span>{t("Small signals.")}</span><span>{t("Better conversations.")}</span></h1>
+          <span className="brand-shape" aria-hidden="true" />
         </div>
-        <p className="privacy-note">Survey responses are anonymous to coordinators and teammates.</p>
+        <p className="brand-copy">{t("Private, recurring feedback designed to help teams talk honestly and act thoughtfully.")}</p>
       </section>
-      <section className="form-panel">
+      <section className="form-panel" aria-labelledby="form-title">
         <div className="form-card">
-          <p className="eyebrow accent">{eyebrow}</p>
-          <h2>{title}</h2>
+          <p className="eyebrow">{eyebrow}</p>
+          <h2 id="form-title">{title}</h2>
           {children}
         </div>
       </section>
@@ -55,7 +87,25 @@ function Shell({ eyebrow, title, children }: { eyebrow: string; title: string; c
   );
 }
 
+function Primary({ busy, disabled, children }: { busy?: boolean; disabled?: boolean; children: ReactNode }) {
+  return (
+    <button className="case-link primary" disabled={busy || disabled} aria-busy={busy}>
+      <span>{children}</span><span className="case-link__icon" aria-hidden="true" />
+    </button>
+  );
+}
+
+function ErrorMessage({ message }: { message: string }) {
+  const { t } = useLocale();
+  return message ? <p className="error" role="alert">{t(message)}</p> : null;
+}
+
+function errorText(caught: unknown, fallback: string) {
+  return caught instanceof Error ? caught.message : fallback;
+}
+
 function Login({ onLogin }: { onLogin: (user: CurrentUser) => void }) {
+  const { t } = useLocale();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -65,68 +115,92 @@ function Login({ onLogin }: { onLogin: (user: CurrentUser) => void }) {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    setBusy(true); setError("");
+    setBusy(true);
+    setError("");
     try {
-      const result = await api<{ user: CurrentUser }>("/api/auth/login", {
-        method: "POST", body: JSON.stringify({ email, password }),
-      });
-      onLogin(result.user);
+      if (forgot) {
+        await api("/api/auth/password-reset/request", { method: "POST", body: JSON.stringify({ email }) });
+        setResetSent(true);
+      } else {
+        const result = await api<{ user: CurrentUser }>("/api/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+        });
+        onLogin(result.user);
+      }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to sign in.");
-    } finally { setBusy(false); }
+      setError(errorText(caught, forgot ? "Unable to request a reset." : "Unable to sign in."));
+    } finally {
+      setBusy(false);
+    }
   }
-
-  async function requestReset(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setError("");
-    try { await api("/api/auth/password-reset/request", { method: "POST", body: JSON.stringify({ email }) }); setResetSent(true); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to request a reset."); }
-    finally { setBusy(false); }
-  }
-
-  if (forgot) return (
-    <Shell eyebrow="Account recovery" title="Reset your password">
-      <form onSubmit={requestReset} className="stack">
-        <p className="helper">Enter your work email. If it belongs to an active account, we’ll send a short-lived reset link.</p>
-        <Field label="Work email" type="email" value={email} onChange={setEmail} autoComplete="username" />
-        {resetSent && <p className="success" role="status">Check your inbox if the account exists.</p>}
-        {error && <p className="error" role="alert">{error}</p>}
-        <button className="primary" disabled={busy}>{busy ? "Sending…" : "Send reset link"}</button>
-        <button type="button" className="text-button align-left" onClick={() => setForgot(false)}>Back to sign in</button>
-      </form>
-    </Shell>
-  );
 
   return (
-    <Shell eyebrow="Welcome back" title="Sign in to continue">
+    <Shell eyebrow={t(forgot ? "Account recovery" : "Welcome back")} title={t(forgot ? "Reset your password" : "Sign in to continue")}>
       <form onSubmit={submit} className="stack">
-        <Field label="Work email" type="email" value={email} onChange={setEmail} autoComplete="username" />
-        <Field label="Password" type="password" value={password} onChange={setPassword} autoComplete="current-password" />
-        {error && <p className="error" role="alert">{error}</p>}
-        <button className="primary" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
-        <button type="button" className="text-button align-left" onClick={() => setForgot(true)}>Forgot your password?</button>
-        <p className="helper">Accounts are invitation-only. Ask an administrator if you need access.</p>
+        {forgot && <p className="helper">{t("Enter your work email. If it belongs to an active account, we’ll send a short-lived reset link.")}</p>}
+        <Field label={t("Work email")} type="email" value={email} onChange={setEmail} autoComplete="username" />
+        {!forgot && <Field label={t("Password")} type="password" value={password} onChange={setPassword} autoComplete="current-password" />}
+        {forgot && resetSent && <p className="success" role="status">{t("Check your inbox if the account exists.")}</p>}
+        <ErrorMessage message={error} />
+        <Primary busy={busy}>{t(forgot ? (busy ? "Sending…" : "Send reset link") : (busy ? "Signing in…" : "Sign in"))}</Primary>
+        <button type="button" className="text-button align-left" onClick={() => { setForgot(!forgot); setError(""); }}>
+          {t(forgot ? "Back to sign in" : "Forgot your password?")}
+        </button>
+        {!forgot && <p className="helper">{t("Accounts are invitation-only. Ask an administrator if you need access.")}</p>}
       </form>
     </Shell>
   );
 }
 
 function ResetPassword({ token }: { token?: string }) {
-  const [password, setPassword] = useState(""); const [confirm, setConfirm] = useState("");
-  const [error, setError] = useState(token ? "" : "This reset link is incomplete."); const [done, setDone] = useState(false); const [busy, setBusy] = useState(false);
+  const { t, locale } = useLocale();
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState(token ? "" : "This reset link is incomplete.");
+  const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+
   async function submit(event: FormEvent) {
-    event.preventDefault(); if (!token) return; if (password !== confirm) { setError("The passwords do not match."); return; }
-    setBusy(true); setError("");
-    try { await api("/api/auth/password-reset/accept", { method: "POST", body: JSON.stringify({ token, password }) }); setDone(true); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to reset your password."); }
-    finally { setBusy(false); }
+    event.preventDefault();
+    if (!token) return;
+    if (password !== confirm) {
+      setError("The passwords do not match.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await api("/api/auth/password-reset/accept", { method: "POST", body: JSON.stringify({ token, password }) });
+      setDone(true);
+    } catch (caught) {
+      setError(errorText(caught, "Unable to reset your password."));
+    } finally {
+      setBusy(false);
+    }
   }
-  return <Shell eyebrow="Account recovery" title={done ? "Password updated" : "Choose a new password"}>
-    {done ? <div className="stack"><p className="success" role="status">Your other sessions have been signed out.</p><a className="primary link-button" href="/">Return to sign in</a></div> :
-      <form onSubmit={submit} className="stack"><Field label="New password" type="password" value={password} onChange={setPassword} autoComplete="new-password" hint="Use at least 15 characters. Passphrases work well." minLength={15} /><Field label="Confirm password" type="password" value={confirm} onChange={setConfirm} autoComplete="new-password" minLength={15} />{error && <p className="error" role="alert">{error}</p>}<button className="primary" disabled={busy || !token}>{busy ? "Updating…" : "Update password"}</button></form>}
-  </Shell>;
+
+  return (
+    <Shell eyebrow={t("Account recovery")} title={t(done ? "Password updated" : "Choose a new password")}>
+      {done ? (
+        <div className="stack">
+          <p className="success" role="status">{t("Your other sessions have been signed out.")}</p>
+          <a className="case-link" href={`/?lang=${locale}`}>{t("Return to sign in")}<span className="case-link__icon" aria-hidden="true" /></a>
+        </div>
+      ) : (
+        <form onSubmit={submit} className="stack">
+          <Field label={t("New password")} type="password" value={password} onChange={setPassword} autoComplete="new-password" hint={t("Use at least 15 characters. Passphrases work well.")} minLength={15} />
+          <Field label={t("Confirm password")} type="password" value={confirm} onChange={setConfirm} autoComplete="new-password" minLength={15} />
+          <ErrorMessage message={error} />
+          <Primary busy={busy} disabled={!token}>{t(busy ? "Updating…" : "Update password")}</Primary>
+        </form>
+      )}
+    </Shell>
+  );
 }
 
 function AcceptInvite({ token, onAccepted }: { token?: string; onAccepted: (user: CurrentUser) => void }) {
+  const { t, locale } = useLocale();
   const [invite, setInvite] = useState<Invite | null>(null);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -134,66 +208,104 @@ function AcceptInvite({ token, onAccepted }: { token?: string; onAccepted: (user
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!token) { setError("This invitation link is incomplete."); return; }
+    if (!token) {
+      setError("This invitation link is incomplete.");
+      return;
+    }
     api<{ invitation: Invite }>("/api/auth/invitations/resolve", { method: "POST", body: JSON.stringify({ token }) })
       .then(({ invitation }) => setInvite(invitation))
-      .catch((caught) => setError(caught instanceof Error ? caught.message : "This invitation is not available."));
+      .catch((caught) => setError(errorText(caught, "This invitation is not available.")));
   }, [token]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (password !== confirm) { setError("The passwords do not match."); return; }
+    if (password !== confirm) {
+      setError("The passwords do not match.");
+      return;
+    }
     if (!token) return;
-    setBusy(true); setError("");
+    setBusy(true);
+    setError("");
     try {
       const result = await api<{ user: CurrentUser }>("/api/auth/invitations/accept", {
-        method: "POST", body: JSON.stringify({ token, password }),
+        method: "POST",
+        body: JSON.stringify({ token, password }),
       });
-      window.history.replaceState({}, "", "/");
+      window.history.replaceState({}, "", `/?lang=${locale}`);
       onAccepted(result.user);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to create your account.");
-    } finally { setBusy(false); }
+      setError(errorText(caught, "Unable to create your account."));
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
-    <Shell eyebrow="You’re invited" title={invite ? `Welcome, ${invite.displayName}` : "Checking your invitation"}>
-      {invite && <form onSubmit={submit} className="stack">
-        <Field label="Work email" type="email" value={invite.email} readOnly autoComplete="username" />
-        <Field label="Create password" type="password" value={password} onChange={setPassword} autoComplete="new-password" hint="Use at least 15 characters. Passphrases work well." minLength={15} />
-        <Field label="Confirm password" type="password" value={confirm} onChange={setConfirm} autoComplete="new-password" minLength={15} />
-        {error && <p className="error" role="alert">{error}</p>}
-        <button className="primary" disabled={busy}>{busy ? "Creating account…" : "Create account"}</button>
-      </form>}
-      {!invite && <p className={error ? "error" : "helper"} role={error ? "alert" : undefined}>{error || "Validating the secure link…"}</p>}
+    <Shell eyebrow={t("You’re invited")} title={invite ? t("Welcome, {name}", { name: invite.displayName }) : t("Checking your invitation")}>
+      {invite ? (
+        <form onSubmit={submit} className="stack">
+          <Field label={t("Work email")} type="email" value={invite.email} readOnly autoComplete="username" />
+          <Field label={t("Create password")} type="password" value={password} onChange={setPassword} autoComplete="new-password" hint={t("Use at least 15 characters. Passphrases work well.")} minLength={15} />
+          <Field label={t("Confirm password")} type="password" value={confirm} onChange={setConfirm} autoComplete="new-password" minLength={15} />
+          <ErrorMessage message={error} />
+          <Primary busy={busy}>{t(busy ? "Creating account…" : "Create account")}</Primary>
+        </form>
+      ) : error ? (
+        <ErrorMessage message={error} />
+      ) : (
+        <p className="helper" role="status">{t("Validating the secure link…")}</p>
+      )}
     </Shell>
   );
 }
 
-function Home({ user }: { user: CurrentUser }) {
-  async function logout() {
-    await api("/api/auth/logout", { method: "POST", body: "{}" }).catch(() => undefined);
-    window.location.assign("/");
-  }
+function Home({ user, error }: { user: CurrentUser; error: string }) {
+  const { t } = useLocale();
   return (
-    <main className="home">
-      <nav><div className="wordmark">Team Feedback</div><button className="text-button" onClick={logout}>Sign out</button></nav>
+    <main id="main-content" className="home page-width">
       <section className="welcome">
-        <p className="eyebrow accent">Workspace ready</p>
-        <h1>Hello, {user.displayName}</h1>
-        <p>Your account is active. Product dashboards will arrive in the next implementation phases.</p>
-        <div className="roles" aria-label="Your roles">{user.roles.map((role) => <span key={role}>{role}</span>)}</div>
+        <p className="availability"><span className="availability__dot" aria-hidden="true" />{t("Workspace ready")}</p>
+        <h1>{t("Hello, {name}", { name: user.displayName })}<span className="welcome-shell shell-icon" aria-hidden="true" /></h1>
+        <p className="welcome-copy">{t("Your account is active. Product dashboards will arrive in the next implementation phases.")}</p>
+        <div className="roles" aria-label={t("Your roles")}>{user.roles.map((role) => <span key={role}>{t(role)}</span>)}</div>
+        <ErrorMessage message={error} />
       </section>
     </main>
   );
 }
 
-function Field(props: { label: string; type: string; value: string; onChange?: (value: string) => void; readOnly?: boolean; autoComplete?: string; hint?: string; minLength?: number }) {
+function Field(props: {
+  label: string;
+  type: string;
+  value: string;
+  onChange?: (value: string) => void;
+  readOnly?: boolean;
+  autoComplete?: string;
+  hint?: string;
+  minLength?: number;
+}) {
   const { label, hint, onChange, ...inputProps } = props;
-  const id = label.toLowerCase().replaceAll(" ", "-");
-  return <label htmlFor={id}><span>{label}</span><input id={id} {...inputProps} onChange={(event) => onChange?.(event.target.value)} />{hint && <small>{hint}</small>}</label>;
-}
-
-function CenteredMessage({ children }: { children: React.ReactNode }) {
-  return <main className="centered"><p>{children}</p></main>;
+  const { t } = useLocale();
+  const id = useId();
+  return (
+    <label className="field" htmlFor={id}>
+      <span>{label}</span>
+      <input
+        id={id}
+        {...inputProps}
+        required
+        aria-describedby={hint ? `${id}-hint` : undefined}
+        onChange={(event) => {
+          event.target.setCustomValidity("");
+          onChange?.(event.target.value);
+        }}
+        onInvalid={(event) => {
+          const input = event.currentTarget;
+          input.setCustomValidity("");
+          input.setCustomValidity(t(input.validity.valueMissing ? "Please fill out this field." : input.validity.typeMismatch ? "Please enter a valid email address." : "Use at least 15 characters."));
+        }}
+      />
+      {hint && <small id={`${id}-hint`}>{hint}</small>}
+    </label>
+  );
 }

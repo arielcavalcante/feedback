@@ -13,6 +13,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     credentials: "same-origin",
     headers: {
       "Content-Type": "application/json",
+      "X-Feedback-Locale": document.documentElement.lang === "en" ? "en" : "pt-BR",
       ...init?.headers,
     },
   });

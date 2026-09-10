@@ -100,6 +100,20 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 - **Why:** Keep the feedback product visually related to the existing portfolio while maintaining one explicit source of truth for color.
 - **Consequences:** New components must use these variables instead of literal colors. Typography, spacing, and component structure are not inherited by this decision.
 
+## ADR-015 — Brazilian Portuguese is the default locale
+
+- **Status:** accepted
+- **Decision:** Present product UI, browser metadata, validation, API errors, and transactional account email in Brazilian Portuguese by default. Preserve the original English copy as an alternative locale selected by the portfolio-style language switch. The switch is on for Portuguese, remembers the browser preference, and supports an explicit `?lang=` override.
+- **Why:** The initial team works in Portuguese while an English version remains useful and already has reviewed copy.
+- **Consequences:** Every new user-facing message must enter the shared localization catalog. Account email uses the locale of the action that generated it. Internal codes, database keys, and logs remain language-neutral.
+
+## ADR-016 — Reuse the portfolio interaction language
+
+- **Status:** accepted
+- **Decision:** Reuse Clash Grotesk and the header, mobile menu, language switch, shell marker, pill button, animated arrow, spacing rhythm, and responsive behavior from `ariel-portfolio-react`, adapted to the feedback product navigation.
+- **Why:** Make both products feel like members of the same visual system rather than merely sharing a palette.
+- **Consequences:** Shared assets are copied into this repository so deployment remains independent. Product components keep their own accessible labels and behavior; future visual changes should be checked against the portfolio patterns.
+
 ## Open questions before implementation/launch
 
 ### MVP password work factor exception — accepted 2026-09-09
