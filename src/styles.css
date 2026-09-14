@@ -38,15 +38,9 @@ p, h1, h2 { margin: 0; }
 /* Header: structure and motion mirror ariel-portfolio-react. */
 .site-header { position: fixed; top: 0; z-index: 100; width: 100%; background: color-mix(in srgb, var(--paper) 92%, transparent); color: var(--brand-blue); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
 .site-header__inner { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 24px; width: min(100%, var(--page-width)); height: 64px; margin-inline: auto; padding: 16px 32px; }
-.brand-mark { position: relative; display: block; width: 80px; height: 30px; color: var(--orange); }
-.brand-mark::before, .brand-mark::after { position: absolute; inset: 0; background: currentColor; -webkit-mask-position: center; mask-position: center; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-size: contain; mask-size: contain; transition: opacity 320ms ease; content: ""; }
-.brand-mark::before { -webkit-mask-image: url("/assets/icons/logo/ariel logo.svg"); mask-image: url("/assets/icons/logo/ariel logo.svg"); opacity: 1; }
-.brand-mark::after { -webkit-mask-image: url("/assets/icons/logo/a logo.svg"); mask-image: url("/assets/icons/logo/a logo.svg"); -webkit-mask-position: left center; mask-position: left center; opacity: 0; }
-.brand-mark.is-symbol::before { opacity: 0; }
-.brand-mark.is-symbol::after { opacity: 1; }
-.brand-mark.is-symbol:hover::before, .brand-mark.is-symbol:focus-visible::before { opacity: 1; }
-.brand-mark.is-symbol:hover::after, .brand-mark.is-symbol:focus-visible::after { opacity: 0; }
-.brand-mark img, .footer-mark img { width: 100%; height: 100%; opacity: 0; }
+.brand-mark { display: block; width: 42px; height: 30px; flex: 0 0 auto; transition: transform 320ms cubic-bezier(.22, 1, .36, 1); }
+.brand-mark:hover, .brand-mark:focus-visible { transform: translateY(-2px); }
+.brand-mark img, .footer-mark img { width: 100%; height: 100%; object-fit: contain; object-position: left center; }
 .desktop-nav { display: flex; align-items: center; gap: 40px; color: var(--brand-blue); font-size: 14px; font-weight: 500; }
 .nav-primary-link { display: inline-flex; align-items: center; gap: 10px; background: transparent; text-decoration: none; cursor: pointer; transition: opacity 180ms ease; }
 .nav-primary-link:hover, .nav-primary-link:focus-visible { opacity: .58; }
@@ -155,7 +149,7 @@ small, .helper { color: color-mix(in srgb, var(--brand-blue) 72%, var(--paper));
 .site-footer { overflow: hidden; background: var(--paper); color: var(--brand-blue); }
 .site-footer__inner { position: relative; display: flex; justify-content: space-between; flex-wrap: wrap; align-items: center; gap: 48px; width: min(100%, var(--page-width)); min-height: 300px; margin-inline: auto; padding: clamp(40px, 6vw, 88px); isolation: isolate; }
 .footer-brand { position: relative; z-index: 2; display: flex; align-items: center; }
-.footer-mark { display: block; width: 122px; height: 60px; flex: 0 0 auto; background: currentColor; color: var(--orange); -webkit-mask: url("/assets/icons/logo/ariel cavalcante logo.svg") center / contain no-repeat; mask: url("/assets/icons/logo/ariel cavalcante logo.svg") center / contain no-repeat; }
+.footer-mark { display: block; width: 72px; height: 52px; flex: 0 0 auto; }
 .footer-columns { position: relative; z-index: 1; display: flex; justify-content: flex-end; }
 .footer-contact-list { display: flex; max-width: 520px; flex-direction: column; align-items: flex-start; gap: 12px; }
 .footer-title { color: var(--orange); font-size: clamp(28px, 3vw, 42px); }
@@ -177,8 +171,6 @@ small, .helper { color: color-mix(in srgb, var(--brand-blue) 72%, var(--paper));
   .desktop-nav > .nav-primary-link { display: flex; align-items: center; gap: 24px; width: 100%; padding: 14px 0; font-size: clamp(18px, 5.6vw, 25px); font-weight: 600; line-height: 1.2; }
   .desktop-nav .is-active::after { position: absolute; top: 50%; left: -42px; width: 22px; height: 17px; background: var(--orange); transform: translateY(-50%); -webkit-mask: url("/assets/icons/single shell.svg") center / contain no-repeat; mask: url("/assets/icons/single shell.svg") center / contain no-repeat; content: ""; }
   .brand-mark { height: 28px; }
-  .site-header.is-menu-open .brand-mark::before { opacity: 1; }
-  .site-header.is-menu-open .brand-mark::after { opacity: 0; }
   .shell { padding-top: 60px; grid-template-columns: 1fr; }
   .brand-panel { min-height: 500px; padding: 56px 24px; }
   .brand-title h1 { font-size: clamp(55px, 15vw, 92px); }

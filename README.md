@@ -20,7 +20,7 @@ Every 14 days, employees receive a short survey about their coordinator, team, a
 
 The Worker is the authorization and privacy boundary. Browser code must never receive hidden survey attribution or raw answers that it does not need.
 
-The interface follows the visual language of `ariel-portfolio-react`: Clash Grotesk, the real portfolio logo assets, fixed navigation, mobile menu, pill actions, and shared icon assets. Portuguese is the visible default; `?lang=en` remains available for development and localization review until language selection moves to profile settings.
+The interface follows the visual language of `ariel-portfolio-react`: Clash Grotesk, fixed navigation, mobile menu, pill actions, and shared interaction patterns. The product uses its own `ino` logo from `public/assets/logo.svg`. Portuguese is the visible default; `?lang=en` remains available for development and localization review until language selection moves to profile settings.
 
 ## Roles and capabilities
 

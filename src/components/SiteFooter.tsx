@@ -7,7 +7,7 @@ export function SiteFooter() {
       <div className="site-footer__inner">
         <div className="footer-brand">
           <a className="footer-mark" href={`/?lang=${locale}`} aria-label={t("Team Feedback")}>
-            <img src="/assets/icons/logo/ariel cavalcante logo.svg" alt="" aria-hidden="true" />
+            <img src="/assets/logo.svg" alt="" aria-hidden="true" />
           </a>
         </div>
         <div className="footer-columns">

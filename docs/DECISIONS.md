@@ -110,7 +110,7 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 ## ADR-016 — Reuse the portfolio interaction language
 
 - **Status:** accepted
-- **Decision:** Reuse Clash Grotesk and the header, mobile menu, shell marker, pill button, animated arrow, spacing rhythm, responsive behavior, and original logo assets from `ariel-portfolio-react`, adapted to the feedback product navigation.
+- **Decision:** Reuse Clash Grotesk and the header, mobile menu, shell marker, pill button, animated arrow, spacing rhythm, and responsive behavior from `ariel-portfolio-react`, adapted to the feedback product navigation. Use the feedback product's own `ino` logo from `public/assets/logo.svg`.
 - **Why:** Make both products feel like members of the same visual system rather than merely sharing a palette.
 - **Consequences:** Shared assets are copied into this repository so deployment remains independent. Product components keep their own accessible labels and behavior; future visual changes should be checked against the portfolio patterns.
 
