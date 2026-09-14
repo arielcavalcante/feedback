@@ -96,6 +96,7 @@ export const portuguese = {
   "employee": "Colaborador",
   "Sign out": "Sair",
   "Home": "Início",
+  "Feedback": "Avaliação",
   "Privacy": "Privacidade",
   "Primary navigation": "Navegação principal",
   "Open menu": "Abrir menu",

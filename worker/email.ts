@@ -14,7 +14,7 @@ export async function sendAccountEmail(env: Env, input: { to: string; locale: Lo
       to: [input.to],
       subject: input.subject,
       text: `${input.heading}\n\n${input.body}\n\n${input.actionLabel}: ${input.actionUrl}`,
-      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#171a31"><h1>${escapeHtml(input.heading)}</h1><p>${escapeHtml(input.body)}</p><p><a href="${escapeHtml(input.actionUrl)}" style="background:#22458b;color:#f2f2f1;padding:12px 18px;border-radius:999px;text-decoration:none">${escapeHtml(input.actionLabel)}</a></p><p style="color:#591d0d;font-size:13px">${escapeHtml(translate("If you did not expect this message, you can ignore it.", input.locale))}</p></div>`,
+      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#22458b"><h1>${escapeHtml(input.heading)}</h1><p>${escapeHtml(input.body)}</p><p><a href="${escapeHtml(input.actionUrl)}" style="background:#e53412;color:#f2f2f1;padding:12px 18px;border-radius:999px;text-decoration:none">${escapeHtml(input.actionLabel)}</a></p><p style="color:#22458b;font-size:13px">${escapeHtml(translate("If you did not expect this message, you can ignore it.", input.locale))}</p></div>`,
     }),
   });
   if (!response.ok) throw new Error(`resend_${response.status}`);

@@ -1,47 +1,83 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FocusEvent, type MouseEvent } from "react";
 import { useLocale } from "../i18n";
 
-// Adapted from ariel-portfolio-react: same header, mobile menu and locale control.
 export function SiteHeader({ signedIn, onSignOut }: { signedIn: boolean; onSignOut: () => void }) {
   const { locale, setLocale, t } = useLocale();
-  const [open, setOpen] = useState(false);
-  const button = useRef<HTMLButtonElement>(null);
-  const navigation = useRef<HTMLElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [pastTop, setPastTop] = useState(false);
+  const navigationRef = useRef<HTMLElement>(null);
+  const markerRef = useRef<HTMLSpanElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
   useEffect(() => {
-    document.body.classList.toggle("menu-open", open);
-    if (!open) return () => document.body.classList.remove("menu-open");
-    navigation.current?.querySelector<HTMLElement>("a, button")?.focus();
+    const updateLogo = () => setPastTop(window.scrollY > 1);
+    updateLogo();
+    window.addEventListener("scroll", updateLogo, { passive: true });
+    return () => window.removeEventListener("scroll", updateLogo);
+  }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle("menu-open", menuOpen);
+    if (!menuOpen) return () => document.body.classList.remove("menu-open");
     function keydown(event: KeyboardEvent) {
-      if (event.key === "Escape") { setOpen(false); button.current?.focus(); }
-      if (event.key === "Tab") {
-        const items = [...(navigation.current?.querySelectorAll<HTMLElement>("a, button") ?? []), button.current!];
-        const first = items[0], last = items[items.length - 1];
-        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-      }
+      if (event.key === "Escape") { setMenuOpen(false); menuButtonRef.current?.focus(); }
     }
     window.addEventListener("keydown", keydown);
     const desktop = window.matchMedia("(min-width: 810px)");
-    const resized = () => { if (desktop.matches) setOpen(false); };
+    const resized = () => { if (desktop.matches) setMenuOpen(false); };
     desktop.addEventListener("change", resized);
     return () => { document.body.classList.remove("menu-open"); window.removeEventListener("keydown", keydown); desktop.removeEventListener("change", resized); };
-  }, [open]);
-  return <header className={`site-header${open ? " is-menu-open" : ""}`}>
-    <div className="site-header__inner">
-      <a className="brand-mark" href={`/?lang=${locale}`} aria-label={t("Team Feedback")}>ino<span aria-hidden="true">.</span></a>
-      <nav ref={navigation} id="primary-navigation" className={`desktop-nav${open ? " is-open" : ""}`} aria-label={t("Primary navigation")}>
-        <a className="nav-primary-link is-active" href={`/?lang=${locale}`} aria-current="page" onClick={() => setOpen(false)}>{t("Home")}</a>
-        <a className="nav-primary-link" href="#privacy" onClick={() => setOpen(false)}>{t("Privacy")}</a>
-        {signedIn && <button className="nav-primary-link" type="button" onClick={() => { setOpen(false); onSignOut(); }}>{t("Sign out")}</button>}
-        <button type="button" role="switch" aria-checked={locale === "pt-BR"} aria-label={t("Language: Portuguese")}
-          className={`language-switch${locale === "pt-BR" ? " active" : ""}`} onClick={() => setLocale(locale === "pt-BR" ? "en" : "pt-BR")}>
-          <span>{t("Portuguese")}</span><span className="language-switch__track" aria-hidden="true"><span className="language-switch__thumb" /></span>
-        </button>
-      </nav>
-      <button ref={button} className="menu-button" type="button" aria-label={t(open ? "Close menu" : "Open menu")} aria-expanded={open} aria-controls="primary-navigation" onClick={() => setOpen(!open)}>
-        <span className={`menu-button__icon menu-button__icon--${open ? "close" : "open"}`} aria-hidden="true" />
-      </button>
-    </div>
-  </header>;
-}
+  }, [menuOpen]);
 
+  function moveMarker(target: HTMLElement | null) {
+    const navigation = navigationRef.current;
+    const marker = markerRef.current;
+    if (!navigation || !marker || !target) { marker?.classList.remove("is-ready"); return; }
+    const navRect = navigation.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const placement = target.dataset.navMarker || "below";
+    marker.style.left = placement === "left" ? `${targetRect.left - navRect.left - 13}px` : `${targetRect.left - navRect.left + targetRect.width / 2}px`;
+    marker.style.top = placement === "left" ? `${targetRect.top - navRect.top + targetRect.height / 2}px` : `${targetRect.bottom - navRect.top + 7}px`;
+    marker.dataset.placement = placement;
+    marker.classList.add("is-ready");
+  }
+
+  function restoreMarker() { moveMarker(navigationRef.current?.querySelector<HTMLElement>("[data-nav-current]") ?? null); }
+  function moveMarkerFromMouse(event: MouseEvent<HTMLElement>) {
+    const target = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-nav-marker]") : null;
+    if (target) moveMarker(target);
+  }
+  function moveMarkerFromFocus(event: FocusEvent<HTMLElement>) { moveMarker(event.target.closest<HTMLElement>("[data-nav-marker]")); }
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(restoreMarker);
+    window.addEventListener("resize", restoreMarker);
+    return () => { cancelAnimationFrame(frame); window.removeEventListener("resize", restoreMarker); };
+  }, [locale, signedIn]);
+
+  const closeMenu = () => setMenuOpen(false);
+  return (
+    <header className={`site-header${menuOpen ? " is-menu-open" : ""}${pastTop ? " is-scrolled" : ""}`}>
+      <div className="site-header__inner">
+        <a className={`brand-mark brand-mark--compact${pastTop ? " is-symbol" : ""}`} href={`/?lang=${locale}`} aria-label={t("Team Feedback")} onClick={closeMenu}>
+          <span className="brand-mark__full">ino<span aria-hidden="true">.</span></span>
+          <span className="brand-mark__symbol" aria-hidden="true">i<span>.</span></span>
+        </a>
+        <nav ref={navigationRef} id="primary-navigation" className={`desktop-nav${menuOpen ? " is-open" : ""}`} aria-label={t("Primary navigation")} onMouseOver={moveMarkerFromMouse} onMouseLeave={restoreMarker} onFocusCapture={moveMarkerFromFocus}>
+          <a className="nav-primary-link is-active" href={`/?lang=${locale}`} aria-current="page" data-nav-marker="below" data-nav-current onClick={closeMenu}>{t("Home")}</a>
+          {signedIn && <a className="nav-primary-link" href="#active-feedback" data-nav-marker="below" onClick={closeMenu}>{t("Feedback")}</a>}
+          {signedIn && <a className="nav-primary-link" href="#history" data-nav-marker="below" onClick={closeMenu}>{t("History")}</a>}
+          <a className="nav-primary-link" href="#privacy" data-nav-marker="below" onClick={closeMenu}>{t("Privacy")}</a>
+          {signedIn && <button className="nav-primary-link nav-action" type="button" data-nav-marker="below" onClick={() => { closeMenu(); onSignOut(); }}>{t("Sign out")}</button>}
+          <button type="button" role="switch" aria-checked={locale === "pt-BR"} aria-label={t("Language: Portuguese")} className={`language-switch${locale === "pt-BR" ? " active" : ""}`} onClick={() => setLocale(locale === "pt-BR" ? "en" : "pt-BR")}>
+            <span>{t("Portuguese")}</span><span className="language-switch__track" aria-hidden="true"><span className="language-switch__thumb" /></span>
+          </button>
+          <span ref={markerRef} className="desktop-nav__marker" aria-hidden="true" />
+        </nav>
+        <button ref={menuButtonRef} className="menu-button" type="button" aria-label={t(menuOpen ? "Close menu" : "Open menu")} aria-expanded={menuOpen} aria-controls="primary-navigation" onClick={() => setMenuOpen((open) => !open)}>
+          <span className={`menu-button__icon menu-button__icon--${menuOpen ? "close" : "open"}`} aria-hidden="true" />
+        </button>
+      </div>
+    </header>
+  );
+}

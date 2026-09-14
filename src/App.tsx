@@ -2,6 +2,7 @@ import { type FormEvent, type ReactNode, useEffect, useId, useState } from "reac
 import { api, type CurrentUser } from "./api";
 import { useLocale } from "./i18n";
 import { SiteHeader } from "./components/SiteHeader";
+import { SiteFooter } from "./components/SiteFooter";
 
 function currentRoute() {
   const url = new URL(window.location.href);
@@ -54,12 +55,7 @@ export function App() {
       ) : (
         <Login onLogin={setUser} />
       )}
-      <footer className="site-footer" id="privacy" tabIndex={-1}>
-        <div className="site-footer__inner page-width">
-          <p>{t("Feedback, with care.")}</p>
-          <p className="privacy-note"><span className="shell-icon" aria-hidden="true" />{t("Survey responses are anonymous to coordinators and teammates.")}</p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
@@ -335,7 +331,7 @@ function EmployeeHome({ user, logoutError }: { user: CurrentUser; logoutError: s
       </section>
 
       <div className="employee-layout">
-        <section className="active-feedback" aria-labelledby="active-feedback-title">
+        <section className="active-feedback" id="active-feedback" aria-labelledby="active-feedback-title">
           {submitted && <p className="success" role="status">{t("Feedback sent. Thank you for taking the time.")}</p>}
           {!dashboard ? (
             <p role="status">{t("Loading your feedback cycles…")}</p>
@@ -374,7 +370,7 @@ function EmployeeHome({ user, logoutError }: { user: CurrentUser; logoutError: s
           {!surveyOpen && <ErrorMessage message={loadError || logoutError} />}
         </section>
 
-        <section className="cycle-history" aria-labelledby="history-title">
+        <section className="cycle-history" id="history" aria-labelledby="history-title">
           <div className="section-heading">
             <div><p className="eyebrow">{t("History")}</p><h2 id="history-title">{t("Your participation")}</h2></div>
             <strong>{dashboard ? t("{count} completed", { count: String(dashboard.history.filter((cycle) => cycle.status === "done").length) }) : "—"}</strong>

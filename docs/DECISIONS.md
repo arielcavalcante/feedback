@@ -114,6 +114,13 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 - **Why:** Make both products feel like members of the same visual system rather than merely sharing a palette.
 - **Consequences:** Shared assets are copied into this repository so deployment remains independent. Product components keep their own accessible labels and behavior; future visual changes should be checked against the portfolio patterns.
 
+## ADR-017 — Paper-only surfaces and two-color hierarchy
+
+- **Status:** accepted
+- **Decision:** Use `paper` for the page and every section background, orange as the primary action/state/brand color, and `brand-blue` as the secondary text/support color. Do not use visible borders. Other portfolio colors require an explicit product decision before use.
+- **Why:** Keep the interface visually quieter and closer to the portfolio's spacious composition while establishing an unambiguous product hierarchy.
+- **Consequences:** Cards are separated with spacing, scale, and restrained orange/blue fills rather than section color blocks or strokes. Account email follows the same hierarchy.
+
 ## Open questions before implementation/launch
 
 ### MVP password work factor exception — accepted 2026-09-09
