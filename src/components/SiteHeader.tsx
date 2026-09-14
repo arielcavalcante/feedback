@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FocusEvent, type MouseEvent } from "r
 import { useLocale } from "../i18n";
 
 export function SiteHeader({ signedIn, onSignOut }: { signedIn: boolean; onSignOut: () => void }) {
-  const { locale, setLocale, t } = useLocale();
+  const { locale, t } = useLocale();
   const [menuOpen, setMenuOpen] = useState(false);
   const [pastTop, setPastTop] = useState(false);
   const navigationRef = useRef<HTMLElement>(null);
@@ -60,8 +60,7 @@ export function SiteHeader({ signedIn, onSignOut }: { signedIn: boolean; onSignO
     <header className={`site-header${menuOpen ? " is-menu-open" : ""}${pastTop ? " is-scrolled" : ""}`}>
       <div className="site-header__inner">
         <a className={`brand-mark brand-mark--compact${pastTop ? " is-symbol" : ""}`} href={`/?lang=${locale}`} aria-label={t("Team Feedback")} onClick={closeMenu}>
-          <span className="brand-mark__full">ino<span aria-hidden="true">.</span></span>
-          <span className="brand-mark__symbol" aria-hidden="true">i<span>.</span></span>
+          <img src="/assets/icons/logo/ariel logo.svg" alt="" aria-hidden="true" />
         </a>
         <nav ref={navigationRef} id="primary-navigation" className={`desktop-nav${menuOpen ? " is-open" : ""}`} aria-label={t("Primary navigation")} onMouseOver={moveMarkerFromMouse} onMouseLeave={restoreMarker} onFocusCapture={moveMarkerFromFocus}>
           <a className="nav-primary-link is-active" href={`/?lang=${locale}`} aria-current="page" data-nav-marker="below" data-nav-current onClick={closeMenu}>{t("Home")}</a>
@@ -69,9 +68,6 @@ export function SiteHeader({ signedIn, onSignOut }: { signedIn: boolean; onSignO
           {signedIn && <a className="nav-primary-link" href="#history" data-nav-marker="below" onClick={closeMenu}>{t("History")}</a>}
           <a className="nav-primary-link" href="#privacy" data-nav-marker="below" onClick={closeMenu}>{t("Privacy")}</a>
           {signedIn && <button className="nav-primary-link nav-action" type="button" data-nav-marker="below" onClick={() => { closeMenu(); onSignOut(); }}>{t("Sign out")}</button>}
-          <button type="button" role="switch" aria-checked={locale === "pt-BR"} aria-label={t("Language: Portuguese")} className={`language-switch${locale === "pt-BR" ? " active" : ""}`} onClick={() => setLocale(locale === "pt-BR" ? "en" : "pt-BR")}>
-            <span>{t("Portuguese")}</span><span className="language-switch__track" aria-hidden="true"><span className="language-switch__thumb" /></span>
-          </button>
           <span ref={markerRef} className="desktop-nav__marker" aria-hidden="true" />
         </nav>
         <button ref={menuButtonRef} className="menu-button" type="button" aria-label={t(menuOpen ? "Close menu" : "Open menu")} aria-expanded={menuOpen} aria-controls="primary-navigation" onClick={() => setMenuOpen((open) => !open)}>

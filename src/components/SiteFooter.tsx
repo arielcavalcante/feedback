@@ -6,7 +6,9 @@ export function SiteFooter() {
     <footer className="site-footer" id="privacy" tabIndex={-1}>
       <div className="site-footer__inner">
         <div className="footer-brand">
-          <a className="footer-mark" href={`/?lang=${locale}`} aria-label={t("Team Feedback")}>ino<span aria-hidden="true">.</span></a>
+          <a className="footer-mark" href={`/?lang=${locale}`} aria-label={t("Team Feedback")}>
+            <img src="/assets/icons/logo/ariel cavalcante logo.svg" alt="" aria-hidden="true" />
+          </a>
         </div>
         <div className="footer-columns">
           <div className="footer-contact-list">

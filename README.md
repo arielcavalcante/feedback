@@ -11,7 +11,7 @@ Every 14 days, employees receive a short survey about their coordinator, team, a
 ## Architecture
 
 - React, TypeScript, and Vite for the web interface.
-- Brazilian Portuguese as the default interface and transactional-email locale, with the reviewed English copy available through the header language switch.
+- Brazilian Portuguese as the default interface and transactional-email locale, with the reviewed English copy retained for a future profile preference.
 - Cloudflare Workers with Static Assets for the web app and API.
 - Cloudflare D1 for relational storage, preferably accessed through Drizzle ORM.
 - Admin-issued email invitations, password authentication, and server-managed sessions.
@@ -20,7 +20,7 @@ Every 14 days, employees receive a short survey about their coordinator, team, a
 
 The Worker is the authorization and privacy boundary. Browser code must never receive hidden survey attribution or raw answers that it does not need.
 
-The interface follows the visual language of `ariel-portfolio-react`: Clash Grotesk, the same authored color tokens, fixed navigation, mobile menu, locale switch, pill actions, and shared icon assets. The language switch is on for Portuguese, remembers the preference locally, and accepts `?lang=pt-BR` or `?lang=en` for explicit links.
+The interface follows the visual language of `ariel-portfolio-react`: Clash Grotesk, the real portfolio logo assets, fixed navigation, mobile menu, pill actions, and shared icon assets. Portuguese is the visible default; `?lang=en` remains available for development and localization review until language selection moves to profile settings.
 
 ## Roles and capabilities
 

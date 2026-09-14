@@ -103,14 +103,14 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 ## ADR-015 — Brazilian Portuguese is the default locale
 
 - **Status:** accepted
-- **Decision:** Present product UI, browser metadata, validation, API errors, and transactional account email in Brazilian Portuguese by default. Preserve the original English copy as an alternative locale selected by the portfolio-style language switch. The switch is on for Portuguese, remembers the browser preference, and supports an explicit `?lang=` override.
+- **Decision:** Present product UI, browser metadata, validation, API errors, and transactional account email in Brazilian Portuguese by default. Preserve the original English copy as an alternative locale. The temporary menu switch described here is superseded by ADR-018; explicit `?lang=` overrides remain available for development and localization review.
 - **Why:** The initial team works in Portuguese while an English version remains useful and already has reviewed copy.
 - **Consequences:** Every new user-facing message must enter the shared localization catalog. Account email uses the locale of the action that generated it. Internal codes, database keys, and logs remain language-neutral.
 
 ## ADR-016 — Reuse the portfolio interaction language
 
 - **Status:** accepted
-- **Decision:** Reuse Clash Grotesk and the header, mobile menu, language switch, shell marker, pill button, animated arrow, spacing rhythm, and responsive behavior from `ariel-portfolio-react`, adapted to the feedback product navigation.
+- **Decision:** Reuse Clash Grotesk and the header, mobile menu, shell marker, pill button, animated arrow, spacing rhythm, responsive behavior, and original logo assets from `ariel-portfolio-react`, adapted to the feedback product navigation.
 - **Why:** Make both products feel like members of the same visual system rather than merely sharing a palette.
 - **Consequences:** Shared assets are copied into this repository so deployment remains independent. Product components keep their own accessible labels and behavior; future visual changes should be checked against the portfolio patterns.
 
@@ -120,6 +120,13 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 - **Decision:** Use `paper` for the page and every section background, orange as the primary action/state/brand color, and `brand-blue` as the secondary text/support color. Do not use visible borders. Other portfolio colors require an explicit product decision before use.
 - **Why:** Keep the interface visually quieter and closer to the portfolio's spacious composition while establishing an unambiguous product hierarchy.
 - **Consequences:** Cards are separated with spacing, scale, and restrained orange/blue fills rather than section color blocks or strokes. Account email follows the same hierarchy.
+
+## ADR-018 — Defer language selection to profile settings
+
+- **Status:** accepted
+- **Decision:** Remove the language control from the global navigation. Keep Brazilian Portuguese as the visible default and add language preference to a future authenticated profile-settings page.
+- **Why:** Language is a durable personal preference, not a primary navigation action.
+- **Consequences:** The English catalog stays maintained and testable through explicit locale URLs, but ordinary users will not see a language control until profile settings ship.
 
 ## Open questions before implementation/launch
 
