@@ -59,7 +59,7 @@ export function SiteHeader({ signedIn, onSignOut }: { signedIn: boolean; onSignO
   return (
     <header className={`site-header${menuOpen ? " is-menu-open" : ""}${pastTop ? " is-scrolled" : ""}`}>
       <div className="site-header__inner">
-        <a className={`brand-mark${pastTop ? " is-scrolled" : ""}`} href={`/?lang=${locale}`} aria-label={t("Team Feedback")} onClick={closeMenu}>
+        <a className="brand-mark" href={`/?lang=${locale}`} aria-label={t("Team Feedback")} onClick={closeMenu}>
           <img src="/assets/logo.svg" alt="" aria-hidden="true" />
         </a>
         <nav ref={navigationRef} id="primary-navigation" className={`desktop-nav${menuOpen ? " is-open" : ""}`} aria-label={t("Primary navigation")} onMouseOver={moveMarkerFromMouse} onMouseLeave={restoreMarker} onFocusCapture={moveMarkerFromFocus}>
