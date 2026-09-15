@@ -96,6 +96,7 @@ export const portuguese = {
   "employee": "Colaborador",
   "Sign out": "Sair",
   "Open profile menu": "Abrir menu do perfil",
+  "Close profile menu": "Fechar menu do perfil",
   "Profile menu": "Menu do perfil",
   "Home": "Início",
   "Feedback": "Avaliação",

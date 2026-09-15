@@ -100,7 +100,7 @@ export function SiteHeader({ user, onSignOut }: { user: CurrentUser | null; onSi
                 ref={profileButtonRef}
                 className="profile-trigger"
                 type="button"
-                aria-label={t("Open profile menu")}
+                aria-label={t(profileOpen ? "Close profile menu" : "Open profile menu")}
                 aria-haspopup="menu"
                 aria-expanded={profileOpen}
                 onClick={() => {
