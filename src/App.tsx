@@ -17,16 +17,25 @@ function currentRoute() {
 }
 const route = currentRoute();
 type Invite = { email: string; displayName: string; expiresAt: string };
+const introKey = (userId: string) => `feedback:intro-completed:${userId}`;
+
+function hasCompletedIntro(userId: string) {
+  try { return window.localStorage.getItem(introKey(userId)) === "1"; } catch { return false; }
+}
 
 export function App() {
   const { t, locale } = useLocale();
   const [user, setUser] = useState<CurrentUser | null>(null);
+  const [introComplete, setIntroComplete] = useState(false);
   const [checking, setChecking] = useState(true);
   const [logoutError, setLogoutError] = useState("");
 
   useEffect(() => {
     api<{ user: CurrentUser }>("/api/auth/me")
-      .then(({ user: nextUser }) => setUser(nextUser))
+      .then(({ user: nextUser }) => {
+        setUser(nextUser);
+        setIntroComplete(hasCompletedIntro(nextUser.id));
+      })
       .catch(() => setUser(null))
       .finally(() => setChecking(false));
   }, []);
@@ -40,22 +49,37 @@ export function App() {
     }
   }
 
+  function authenticate(nextUser: CurrentUser) {
+    setUser(nextUser);
+    setIntroComplete(hasCompletedIntro(nextUser.id));
+  }
+
+  function finishIntro() {
+    if (!user) return;
+    try { window.localStorage.setItem(introKey(user.id), "1"); } catch { /* Continue for this session if storage is unavailable. */ }
+    setIntroComplete(true);
+  }
+
+  const showProductChrome = Boolean(user && introComplete);
+
   return (
     <div className="page-shell">
       <a className="skip-link" href="#main-content">{t("Skip to content")}</a>
-      <SiteHeader user={user} onSignOut={logout} />
+      {showProductChrome && <SiteHeader user={user} onSignOut={logout} />}
       {checking ? (
-        <main id="main-content" className="centered"><p role="status">{t("Preparing your workspace…")}</p></main>
+        <main id="main-content" className="guest-loading"><img src="/assets/logo.svg" alt="" aria-hidden="true" /><p role="status">{t("Preparing your workspace…")}</p></main>
+      ) : user && !introComplete ? (
+        <ProductIntro user={user} onComplete={finishIntro} />
       ) : user ? (
         <Home user={user} error={logoutError} />
       ) : route.view === "invite" ? (
-        <AcceptInvite token={route.token} onAccepted={setUser} />
+        <AcceptInvite token={route.token} onAccepted={authenticate} />
       ) : route.view === "reset" ? (
         <ResetPassword token={route.token} />
       ) : (
-        <Login onLogin={setUser} />
+        <Login onLogin={authenticate} />
       )}
-      <SiteFooter />
+      {showProductChrome && <SiteFooter />}
     </div>
   );
 }
@@ -63,22 +87,73 @@ export function App() {
 function Shell({ eyebrow, title, children }: { eyebrow: string; title: string; children: ReactNode }) {
   const { t } = useLocale();
   return (
-    <main id="main-content" className="shell page-width">
-      <section className="brand-panel" aria-label={t("About Team Feedback")}>
-        <p className="availability"><span className="availability__dot" aria-hidden="true" />{t("A healthier feedback rhythm")}</p>
-        <div className="brand-title">
-          <h1><span>{t("Small signals.")}</span><span>{t("Better conversations.")}</span></h1>
-          <span className="brand-shape" aria-hidden="true" />
-        </div>
-        <p className="brand-copy">{t("Private, recurring feedback designed to help teams talk honestly and act thoughtfully.")}</p>
-      </section>
-      <section className="form-panel" aria-labelledby="form-title">
+    <main id="main-content" className="guest-screen guest-screen--form page-width">
+      <a className="guest-logo" href="/" aria-label={t("Team Feedback")}><img src="/assets/logo.svg" alt="" aria-hidden="true" /></a>
+      <section className="guest-form-panel" aria-labelledby="form-title">
         <div className="form-card">
-          <p className="eyebrow">{eyebrow}</p>
+          {eyebrow && <p className="eyebrow">{eyebrow}</p>}
           <h2 id="form-title">{title}</h2>
           {children}
         </div>
       </section>
+      <span className="guest-accent" aria-hidden="true" />
+    </main>
+  );
+}
+
+function ProductIntro({ user, onComplete }: { user: CurrentUser; onComplete: () => void }) {
+  const { t } = useLocale();
+  const [step, setStep] = useState(0);
+  const firstName = user.displayName.trim().split(/\s+/)[0];
+  const steps = [
+    {
+      title: t("Hey, {name}!", { name: firstName }),
+      paragraphs: [
+        t("Come on in."),
+        t("Have a seat and don’t mind the mess. We’re just finishing up around here."),
+        t("The sun was hot, right? Want a little water?"),
+      ],
+    },
+    {
+      title: t("How it works"),
+      paragraphs: [
+        t("Every two weeks, we’ll ask three quick questions about coordination, the team, and your work."),
+        t("Choose a score from 1 to 5. Add a comment only when you feel like there’s more to say."),
+      ],
+    },
+    {
+      title: t("Your answers stay anonymous"),
+      paragraphs: [
+        t("Coordination only sees the group result after the minimum number of responses is reached."),
+        t("No individual answer appears in meetings or in anyone else’s view."),
+      ],
+    },
+    {
+      title: t("Your home, without the noise"),
+      paragraphs: [
+        t("You’ll see what needs an answer and whether you participated in earlier cycles."),
+        t("Your scores and comments never appear in your history."),
+      ],
+    },
+  ];
+  const current = steps[step];
+  const last = step === steps.length - 1;
+
+  return (
+    <main id="main-content" className="intro-screen page-width">
+      <img className="intro-logo" src="/assets/logo.svg" alt="" aria-hidden="true" />
+      <section className="intro-copy" aria-live="polite">
+        <p className="eyebrow">{t("A quick tour")}</p>
+        <h1>{current.title}</h1>
+        <div className="intro-copy__paragraphs">{current.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}</div>
+      </section>
+      <div className="intro-footer">
+        <span>{t("Step {current} of {total}", { current: String(step + 1), total: String(steps.length) })}</span>
+        <button className="case-link intro-action" type="button" onClick={() => last ? onComplete() : setStep((currentStep) => currentStep + 1)}>
+          <span>{t(last ? "Go to home" : "Continue")}</span><span className="case-link__icon" aria-hidden="true" />
+        </button>
+      </div>
+      <span className="intro-accent" aria-hidden="true" />
     </main>
   );
 }
@@ -102,6 +177,7 @@ function errorText(caught: unknown, fallback: string) {
 
 function Login({ onLogin }: { onLogin: (user: CurrentUser) => void }) {
   const { t } = useLocale();
+  const [started, setStarted] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -131,9 +207,26 @@ function Login({ onLogin }: { onLogin: (user: CurrentUser) => void }) {
     }
   }
 
+  if (!started) {
+    return (
+      <main id="main-content" className="guest-screen guest-screen--hero page-width">
+        <img className="guest-logo" src="/assets/logo.svg" alt="" aria-hidden="true" />
+        <section className="guest-hero-copy" aria-labelledby="guest-title">
+          <h1 id="guest-title">{t("Our 1:1 platform")}</h1>
+          <p>{t("The hand that corrects is the same one that comforts. Growth without HR nonsense.")}</p>
+        </section>
+        <button className="case-link guest-login-action" type="button" onClick={() => setStarted(true)}>
+          <span>{t("Start sign in")}</span><span className="case-link__icon" aria-hidden="true" />
+        </button>
+        <span className="guest-accent" aria-hidden="true" />
+      </main>
+    );
+  }
+
   return (
-    <Shell eyebrow={t(forgot ? "Account recovery" : "Welcome back")} title={t(forgot ? "Reset your password" : "Sign in to continue")}>
+    <Shell eyebrow={t(forgot ? "Account recovery" : "")} title={t(forgot ? "Reset your password" : "Enter your login details")}>
       <form onSubmit={submit} className="stack">
+        {!forgot && <p className="login-support">{t("Having trouble? Talk to me and I’ll sort it out for you:")} <a href="mailto:ino@mail.praiasertao.com.br">ino@mail.praiasertao.com.br</a></p>}
         {forgot && <p className="helper">{t("Enter your work email. If it belongs to an active account, we’ll send a short-lived reset link.")}</p>}
         <Field label={t("Work email")} type="email" value={email} onChange={setEmail} autoComplete="username" />
         {!forgot && <Field label={t("Password")} type="password" value={password} onChange={setPassword} autoComplete="current-password" />}
@@ -143,6 +236,7 @@ function Login({ onLogin }: { onLogin: (user: CurrentUser) => void }) {
         <button type="button" className="text-button align-left" onClick={() => { setForgot(!forgot); setError(""); }}>
           {t(forgot ? "Back to sign in" : "Forgot your password?")}
         </button>
+        {!forgot && <button type="button" className="text-button align-left" onClick={() => setStarted(false)}>{t("Back to presentation")}</button>}
         {!forgot && <p className="helper">{t("Accounts are invitation-only. Ask an administrator if you need access.")}</p>}
       </form>
     </Shell>

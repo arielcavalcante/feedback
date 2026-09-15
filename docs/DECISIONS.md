@@ -117,9 +117,9 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 ## ADR-017 — Paper-only surfaces and two-color hierarchy
 
 - **Status:** accepted
-- **Decision:** Use `paper` for the page and every section background, orange as the primary action/state/brand color, and `brand-blue` as the secondary text/support color. Do not use visible borders. Other portfolio colors require an explicit product decision before use.
-- **Why:** Keep the interface visually quieter and closer to the portfolio's spacious composition while establishing an unambiguous product hierarchy.
-- **Consequences:** Cards are separated with spacing, scale, and restrained orange/blue fills rather than section color blocks or strokes. Account email follows the same hierarchy.
+- **Decision:** Use `paper` for the page and every section background, orange only for calls to action, errors, and the logo's established brand treatment, `gold` for non-interactive accents and status emphasis, and `brand-blue` for secondary text/support color. Do not use visible borders. Brown, yellow, navy, and light blue require a new explicit product decision before use.
+- **Why:** Keep the interface visually quieter and closer to the portfolio's spacious composition while separating actions from decorative or informational emphasis.
+- **Consequences:** Cards are separated with spacing and scale rather than strokes. An orange element must behave as an action or communicate an error; decorative markers and non-action states use gold.
 
 ## ADR-018 — Defer language selection to profile settings
 
@@ -131,7 +131,7 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 ## ADR-019 — Account actions live behind the profile avatar
 
 - **Status:** accepted
-- **Decision:** Show the authenticated user through the `face.svg` avatar in the global header. Open a compact account menu with name, email, and sign-out when the avatar is activated; keep sign-out out of the primary navigation.
+- **Decision:** Show the authenticated user through the blue `face.svg` inside a white circular avatar. On desktop it sits in the global header; on mobile it is the final item inside the navigation menu. Open a compact account menu with name, email, and sign-out when the avatar is activated; keep sign-out out of the primary destination list.
 - **Why:** Separate account actions from product destinations and leave a clear home for future profile settings.
 - **Consequences:** The menu must work with pointer, keyboard, outside click, and Escape. Long email addresses use truncation rather than splitting words.
 
@@ -141,6 +141,13 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 - **Decision:** Use concise, informal Brazilian Portuguese inspired by the approved `ino` mobile screens while keeping the existing English catalog as the alternative locale. Never force hyphenation or split words in the middle.
 - **Why:** Make the product sound like the team and keep headings and labels visually legible.
 - **Consequences:** Layouts must wrap at natural spaces. Unavoidably long identifiers such as email addresses use ellipsis, and responsive QA checks both overflow and computed word-breaking rules.
+
+## ADR-021 — Staged public entry and first-visit introduction
+
+- **Status:** accepted
+- **Decision:** The signed-out experience is a full-page presentation without the authenticated header or footer. Activating its CTA replaces the hero with the login form on the same URL. After authentication, show a short product introduction once per user and browser before opening the home screen.
+- **Why:** Introduce the product in the approved conversational style, keep authentication visually focused, and avoid repeating onboarding during ordinary use.
+- **Consequences:** MVP completion is stored locally under a user-scoped key. Clearing browser storage or using another browser shows the introduction again; account-level synchronization can be added with profile preferences later.
 
 ## Open questions before implementation/launch
 

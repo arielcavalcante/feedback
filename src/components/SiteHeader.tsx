@@ -25,14 +25,14 @@ export function SiteHeader({ user, onSignOut }: { user: CurrentUser | null; onSi
     document.body.classList.toggle("menu-open", menuOpen);
     if (!menuOpen) return () => document.body.classList.remove("menu-open");
     function keydown(event: KeyboardEvent) {
-      if (event.key === "Escape") { setMenuOpen(false); menuButtonRef.current?.focus(); }
+      if (event.key === "Escape" && !profileOpen) { setMenuOpen(false); menuButtonRef.current?.focus(); }
     }
     window.addEventListener("keydown", keydown);
     const desktop = window.matchMedia("(min-width: 810px)");
     const resized = () => { if (desktop.matches) setMenuOpen(false); };
     desktop.addEventListener("change", resized);
     return () => { document.body.classList.remove("menu-open"); window.removeEventListener("keydown", keydown); desktop.removeEventListener("change", resized); };
-  }, [menuOpen]);
+  }, [menuOpen, profileOpen]);
 
   useEffect(() => {
     if (!profileOpen) return;
@@ -79,7 +79,7 @@ export function SiteHeader({ user, onSignOut }: { user: CurrentUser | null; onSi
     return () => { cancelAnimationFrame(frame); window.removeEventListener("resize", restoreMarker); };
   }, [locale, signedIn]);
 
-  const closeMenu = () => setMenuOpen(false);
+  const closeMenu = () => { setMenuOpen(false); setProfileOpen(false); };
   return (
     <header className={`site-header${menuOpen ? " is-menu-open" : ""}${pastTop ? " is-scrolled" : ""}`}>
       <div className="site-header__inner">
@@ -91,9 +91,6 @@ export function SiteHeader({ user, onSignOut }: { user: CurrentUser | null; onSi
           {signedIn && <a className="nav-primary-link" href="#active-feedback" data-nav-marker="below" onClick={closeMenu}>{t("Feedback")}</a>}
           {signedIn && <a className="nav-primary-link" href="#history" data-nav-marker="below" onClick={closeMenu}>{t("History")}</a>}
           <a className="nav-primary-link" href="#privacy" data-nav-marker="below" onClick={closeMenu}>{t("Privacy")}</a>
-          <span ref={markerRef} className="desktop-nav__marker" aria-hidden="true" />
-        </nav>
-        <div className="header-actions">
           {user && (
             <div className={`profile-area${profileOpen ? " is-open" : ""}`} ref={profileRef}>
               <button
@@ -103,12 +100,10 @@ export function SiteHeader({ user, onSignOut }: { user: CurrentUser | null; onSi
                 aria-label={t(profileOpen ? "Close profile menu" : "Open profile menu")}
                 aria-haspopup="menu"
                 aria-expanded={profileOpen}
-                onClick={() => {
-                  setMenuOpen(false);
-                  setProfileOpen((open) => !open);
-                }}
+                onClick={() => setProfileOpen((open) => !open)}
               >
-                <img src="/assets/icons/face.svg" alt="" aria-hidden="true" />
+                <span className="profile-avatar"><img src="/assets/icons/face.svg" alt="" aria-hidden="true" /></span>
+                <span className="profile-trigger__label">{t("Profile")}</span>
               </button>
               {profileOpen && (
                 <div className="profile-menu" role="menu" aria-label={t("Profile menu")}>
@@ -121,6 +116,9 @@ export function SiteHeader({ user, onSignOut }: { user: CurrentUser | null; onSi
               )}
             </div>
           )}
+          <span ref={markerRef} className="desktop-nav__marker" aria-hidden="true" />
+        </nav>
+        <div className="header-actions">
           <button ref={menuButtonRef} className="menu-button" type="button" aria-label={t(menuOpen ? "Close menu" : "Open menu")} aria-expanded={menuOpen} aria-controls="primary-navigation" onClick={() => { setProfileOpen(false); setMenuOpen((open) => !open); }}>
             <span className={`menu-button__icon menu-button__icon--${menuOpen ? "close" : "open"}`} aria-hidden="true" />
           </button>
