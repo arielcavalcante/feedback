@@ -117,9 +117,9 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 ## ADR-017 — Paper-only surfaces and two-color hierarchy
 
 - **Status:** accepted
-- **Decision:** Use `paper` for the page and every section background, orange only for calls to action, errors, and the logo's established brand treatment, `gold` for non-interactive accents and status emphasis, and `brand-blue` for secondary text/support color. Do not use visible borders. Brown, yellow, navy, and light blue require a new explicit product decision before use.
-- **Why:** Keep the interface visually quieter and closer to the portfolio's spacious composition while separating actions from decorative or informational emphasis.
-- **Consequences:** Cards are separated with spacing and scale rather than strokes. An orange element must behave as an action or communicate an error; decorative markers and non-action states use gold.
+- **Decision:** Use `paper` for the page and every section background, `ink` for ordinary page copy, `brand-blue` for headings, overlines, metadata labels, and secondary interface text, orange only for calls to action, errors, and the logo's established brand treatment, and `gold` for graphical accents or filled status surfaces. Never use gold for text on paper. Do not use visible borders. Brown, yellow, navy, and light blue require a new explicit product decision before use.
+- **Why:** Keep the interface visually quiet while preserving readable contrast and separating actions, information, and decoration.
+- **Consequences:** Cards are separated with spacing and scale rather than strokes. Orange elements must behave as actions or communicate errors. Gold may decorate the layout or back dark text, but must not carry small text over the light page background.
 
 ## ADR-018 — Defer language selection to profile settings
 
