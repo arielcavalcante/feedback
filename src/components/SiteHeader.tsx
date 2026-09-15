@@ -1,13 +1,18 @@
 import { useEffect, useRef, useState, type FocusEvent, type MouseEvent } from "react";
+import type { CurrentUser } from "../api";
 import { useLocale } from "../i18n";
 
-export function SiteHeader({ signedIn, onSignOut }: { signedIn: boolean; onSignOut: () => void }) {
+export function SiteHeader({ user, onSignOut }: { user: CurrentUser | null; onSignOut: () => void }) {
   const { locale, t } = useLocale();
+  const signedIn = Boolean(user);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [pastTop, setPastTop] = useState(false);
   const navigationRef = useRef<HTMLElement>(null);
   const markerRef = useRef<HTMLSpanElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
+  const profileButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const updateLogo = () => setPastTop(window.scrollY > 1);
@@ -28,6 +33,25 @@ export function SiteHeader({ signedIn, onSignOut }: { signedIn: boolean; onSignO
     desktop.addEventListener("change", resized);
     return () => { document.body.classList.remove("menu-open"); window.removeEventListener("keydown", keydown); desktop.removeEventListener("change", resized); };
   }, [menuOpen]);
+
+  useEffect(() => {
+    if (!profileOpen) return;
+    function closeProfile(event: PointerEvent) {
+      if (!profileRef.current?.contains(event.target as Node)) setProfileOpen(false);
+    }
+    function keydown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setProfileOpen(false);
+        profileButtonRef.current?.focus();
+      }
+    }
+    window.addEventListener("pointerdown", closeProfile);
+    window.addEventListener("keydown", keydown);
+    return () => {
+      window.removeEventListener("pointerdown", closeProfile);
+      window.removeEventListener("keydown", keydown);
+    };
+  }, [profileOpen]);
 
   function moveMarker(target: HTMLElement | null) {
     const navigation = navigationRef.current;
@@ -67,12 +91,40 @@ export function SiteHeader({ signedIn, onSignOut }: { signedIn: boolean; onSignO
           {signedIn && <a className="nav-primary-link" href="#active-feedback" data-nav-marker="below" onClick={closeMenu}>{t("Feedback")}</a>}
           {signedIn && <a className="nav-primary-link" href="#history" data-nav-marker="below" onClick={closeMenu}>{t("History")}</a>}
           <a className="nav-primary-link" href="#privacy" data-nav-marker="below" onClick={closeMenu}>{t("Privacy")}</a>
-          {signedIn && <button className="nav-primary-link nav-action" type="button" data-nav-marker="below" onClick={() => { closeMenu(); onSignOut(); }}>{t("Sign out")}</button>}
           <span ref={markerRef} className="desktop-nav__marker" aria-hidden="true" />
         </nav>
-        <button ref={menuButtonRef} className="menu-button" type="button" aria-label={t(menuOpen ? "Close menu" : "Open menu")} aria-expanded={menuOpen} aria-controls="primary-navigation" onClick={() => setMenuOpen((open) => !open)}>
-          <span className={`menu-button__icon menu-button__icon--${menuOpen ? "close" : "open"}`} aria-hidden="true" />
-        </button>
+        <div className="header-actions">
+          {user && (
+            <div className={`profile-area${profileOpen ? " is-open" : ""}`} ref={profileRef}>
+              <button
+                ref={profileButtonRef}
+                className="profile-trigger"
+                type="button"
+                aria-label={t("Open profile menu")}
+                aria-haspopup="menu"
+                aria-expanded={profileOpen}
+                onClick={() => {
+                  setMenuOpen(false);
+                  setProfileOpen((open) => !open);
+                }}
+              >
+                <img src="/assets/icons/face.svg" alt="" aria-hidden="true" />
+              </button>
+              {profileOpen && (
+                <div className="profile-menu" role="menu" aria-label={t("Profile menu")}>
+                  <div className="profile-menu__identity">
+                    <strong>{user.displayName}</strong>
+                    <span title={user.email}>{user.email}</span>
+                  </div>
+                  <button className="profile-menu__sign-out" type="button" role="menuitem" onClick={onSignOut}>{t("Sign out")}</button>
+                </div>
+              )}
+            </div>
+          )}
+          <button ref={menuButtonRef} className="menu-button" type="button" aria-label={t(menuOpen ? "Close menu" : "Open menu")} aria-expanded={menuOpen} aria-controls="primary-navigation" onClick={() => { setProfileOpen(false); setMenuOpen((open) => !open); }}>
+            <span className={`menu-button__icon menu-button__icon--${menuOpen ? "close" : "open"}`} aria-hidden="true" />
+          </button>
+        </div>
       </div>
     </header>
   );

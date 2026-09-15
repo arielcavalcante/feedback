@@ -128,6 +128,20 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 - **Why:** Language is a durable personal preference, not a primary navigation action.
 - **Consequences:** The English catalog stays maintained and testable through explicit locale URLs, but ordinary users will not see a language control until profile settings ship.
 
+## ADR-019 — Account actions live behind the profile avatar
+
+- **Status:** accepted
+- **Decision:** Show the authenticated user through the `face.svg` avatar in the global header. Open a compact account menu with name, email, and sign-out when the avatar is activated; keep sign-out out of the primary navigation.
+- **Why:** Separate account actions from product destinations and leave a clear home for future profile settings.
+- **Consequences:** The menu must work with pointer, keyboard, outside click, and Escape. Long email addresses use truncation rather than splitting words.
+
+## ADR-020 — Conversational PT-BR without mid-word breaks
+
+- **Status:** accepted
+- **Decision:** Use concise, informal Brazilian Portuguese inspired by the approved `ino` mobile screens while keeping the existing English catalog as the alternative locale. Never force hyphenation or split words in the middle.
+- **Why:** Make the product sound like the team and keep headings and labels visually legible.
+- **Consequences:** Layouts must wrap at natural spaces. Unavoidably long identifiers such as email addresses use ellipsis, and responsive QA checks both overflow and computed word-breaking rules.
+
 ## Open questions before implementation/launch
 
 ### MVP password work factor exception — accepted 2026-09-09

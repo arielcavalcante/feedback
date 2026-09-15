@@ -43,7 +43,7 @@ export function App() {
   return (
     <div className="page-shell">
       <a className="skip-link" href="#main-content">{t("Skip to content")}</a>
-      <SiteHeader signedIn={Boolean(user)} onSignOut={logout} />
+      <SiteHeader user={user} onSignOut={logout} />
       {checking ? (
         <main id="main-content" className="centered"><p role="status">{t("Preparing your workspace…")}</p></main>
       ) : user ? (
