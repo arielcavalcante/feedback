@@ -60,12 +60,10 @@ export function App() {
     setIntroComplete(true);
   }
 
-  const showProductChrome = Boolean(user && introComplete);
-
   return (
     <div className="page-shell">
       <a className="skip-link" href="#main-content">{t("Skip to content")}</a>
-      {showProductChrome && <SiteHeader user={user} onSignOut={logout} />}
+      {user && <SiteHeader user={user} onSignOut={logout} introMode={!introComplete} />}
       {checking ? (
         <main id="main-content" className="guest-loading"><img src="/assets/logo.svg" alt="" aria-hidden="true" /><p role="status">{t("Preparing your workspace…")}</p></main>
       ) : user && !introComplete ? (
@@ -79,7 +77,7 @@ export function App() {
       ) : (
         <Login onLogin={authenticate} />
       )}
-      {showProductChrome && <SiteFooter />}
+      {user && introComplete && <SiteFooter />}
     </div>
   );
 }
@@ -104,56 +102,94 @@ function Shell({ eyebrow, title, children }: { eyebrow: string; title: string; c
 function ProductIntro({ user, onComplete }: { user: CurrentUser; onComplete: () => void }) {
   const { t } = useLocale();
   const [step, setStep] = useState(0);
-  const firstName = user.displayName.trim().split(/\s+/)[0];
-  const steps = [
-    {
-      title: t("Hey, {name}!", { name: firstName }),
-      paragraphs: [
-        t("Come on in."),
-        t("Have a seat and don’t mind the mess. We’re just finishing up around here."),
-        t("The sun was hot, right? Want a little water?"),
-      ],
-    },
-    {
-      title: t("How it works"),
-      paragraphs: [
-        t("Every two weeks, we’ll ask three quick questions about coordination, the team, and your work."),
-        t("Choose a score from 1 to 5. Add a comment only when you feel like there’s more to say."),
-      ],
-    },
-    {
-      title: t("Your answers stay anonymous"),
-      paragraphs: [
-        t("Coordination only sees the group result after the minimum number of responses is reached."),
-        t("No individual answer appears in meetings or in anyone else’s view."),
-      ],
-    },
-    {
-      title: t("Your home, without the noise"),
-      paragraphs: [
-        t("You’ll see what needs an answer and whether you participated in earlier cycles."),
-        t("Your scores and comments never appear in your history."),
-      ],
-    },
-  ];
-  const current = steps[step];
-  const last = step === steps.length - 1;
+  const [coordinatorName, setCoordinatorName] = useState(t("your coordinator"));
+  const last = step === 3;
+
+  useEffect(() => {
+    if (!user.roles.includes("employee")) return;
+    api<EmployeeDashboardData>("/api/employee/dashboard")
+      .then((dashboard) => {
+        const name = dashboard.activeCycle?.coordinatorName.trim().split(/\s+/)[0];
+        if (name) setCoordinatorName(name);
+      })
+      .catch(() => undefined);
+  }, [user.id, user.roles]);
 
   return (
-    <main id="main-content" className="intro-screen page-width">
-      <img className="intro-logo" src="/assets/logo.svg" alt="" aria-hidden="true" />
-      <section className="intro-copy" aria-live="polite">
-        <p className="eyebrow">{t("A quick tour")}</p>
-        <h1>{current.title}</h1>
-        <div className="intro-copy__paragraphs">{current.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}</div>
-      </section>
-      <div className="intro-footer">
-        <span>{t("Step {current} of {total}", { current: String(step + 1), total: String(steps.length) })}</span>
-        <button className="case-link intro-action" type="button" onClick={() => last ? onComplete() : setStep((currentStep) => currentStep + 1)}>
-          <span>{t(last ? "Go to home" : "Continue")}</span><span className="case-link__icon" aria-hidden="true" />
+    <main id="main-content" className={`intro-screen intro-screen--step-${step} page-width`}>
+      <section className="intro-stage" aria-live="polite">
+        {step === 0 && (
+          <div className="intro-stage__content intro-welcome">
+            <h1>{t("Hey!")}</h1>
+            <p>{t("Come on in.")}</p>
+            <p>{t("The sun was hot, right? Want a little water?")}</p>
+            <p>{t("Have a seat and don’t mind the mess. We’re just finishing up around here.")}</p>
+          </div>
+        )}
+
+        {step === 1 && (
+          <div className="intro-stage__content intro-org">
+            <div>
+              <h1>{t("Organization chart")}</h1>
+              <p>{t("I asked around and saw you report to {name}, right?", { name: coordinatorName })}</p>
+            </div>
+            <div className="intro-org__diagram" role="img" aria-label={t("You and your coordinator")}>
+              <span /><i /><span />
+            </div>
+            <div className="intro-org__copy">
+              <p><strong>{t("Every other Friday")}</strong> {t("you’ll tell me how things are going over there.")}</p>
+              <p>{t("Whether {name} has been helping you, whether your teammates have been treating you well, whether you’ve been working like crazy — that kind of thing.", { name: coordinatorName })}</p>
+            </div>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div className="intro-stage__content intro-ratings">
+            <div>
+              <h1>{t("Ratings")}</h1>
+              <p>{t("We’ll show you a question and you give it a score.")}</p>
+            </div>
+            <div className="intro-rating-scale" aria-label={t("Rating scale from 1 to 5")}>
+              {[1, 2, 3, 4, 5].map((rating) => <span key={rating}>{rating}</span>)}
+            </div>
+            <p className="intro-ratings__where">{t("where")}</p>
+            <div className="intro-rating-legend">
+              <div><strong>1</strong><span>{t("Means really bad")}</span></div>
+              <div><strong>5</strong><span>{t("Means really great")}</span></div>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="intro-stage__content intro-history">
+            <div>
+              <h1>{t("Your ratings")}</h1>
+              <p>{t("Here you can quickly see which feedback cycles you joined and when the next one is.")}</p>
+            </div>
+            <div className="intro-history__cards" aria-label={t("Example feedback history")}>
+              <article className="intro-history-card intro-history-card--next">
+                <img src="/assets/icons/ellipsis.svg" alt="" aria-hidden="true" />
+                <time>{t("SEP 25")}</time>
+                <strong>{t("Next feedback")}</strong>
+              </article>
+              <article className="intro-history-card intro-history-card--skipped">
+                <img src="/assets/icons/dash.svg" alt="" aria-hidden="true" />
+                <time>{t("SEP 11")}</time>
+                <strong>{t("Not answered")}</strong>
+              </article>
+              <article className="intro-history-card intro-history-card--done">
+                <img src="/assets/icons/check.svg" alt="" aria-hidden="true" />
+                <time>{t("AUG 28")}</time>
+                <strong>{t("Completed")}</strong>
+              </article>
+            </div>
+          </div>
+        )}
+
+        <button className={`intro-continue${last ? " intro-continue--final" : ""}`} type="button" onClick={() => last ? onComplete() : setStep((currentStep) => currentStep + 1)}>
+          {t("Continue")}
         </button>
-      </div>
-      <span className="intro-accent" aria-hidden="true" />
+      </section>
     </main>
   );
 }

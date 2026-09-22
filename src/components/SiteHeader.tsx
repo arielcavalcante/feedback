@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FocusEvent, type MouseEvent } from "r
 import type { CurrentUser } from "../api";
 import { useLocale } from "../i18n";
 
-export function SiteHeader({ user, onSignOut }: { user: CurrentUser | null; onSignOut: () => void }) {
+export function SiteHeader({ user, onSignOut, introMode = false }: { user: CurrentUser | null; onSignOut: () => void; introMode?: boolean }) {
   const { locale, t } = useLocale();
   const signedIn = Boolean(user);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -81,7 +81,7 @@ export function SiteHeader({ user, onSignOut }: { user: CurrentUser | null; onSi
 
   const closeMenu = () => { setMenuOpen(false); setProfileOpen(false); };
   return (
-    <header className={`site-header${menuOpen ? " is-menu-open" : ""}${pastTop ? " is-scrolled" : ""}`}>
+    <header className={`site-header${introMode ? " site-header--intro" : ""}${menuOpen ? " is-menu-open" : ""}${pastTop ? " is-scrolled" : ""}`}>
       <div className="site-header__inner">
         <a className="brand-mark" href={`/?lang=${locale}`} aria-label={t("Team Feedback")} onClick={closeMenu}>
           <img src="/assets/logo.svg" alt="" aria-hidden="true" />

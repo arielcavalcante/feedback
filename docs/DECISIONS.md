@@ -145,7 +145,7 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 ## ADR-021 — Staged public entry and first-visit introduction
 
 - **Status:** accepted
-- **Decision:** The signed-out experience is a full-page presentation without the authenticated header or footer. Activating its CTA replaces the hero with the login form on the same URL. After authentication, show a short product introduction once per user and browser before opening the home screen.
+- **Decision:** The signed-out experience is a full-page presentation without the authenticated header or footer. Activating its CTA replaces the hero with the login form on the same URL. After authentication, show the four approved Figma introduction screens once per user and browser before opening the home screen. The introduction uses the minimal authenticated header, direct screen titles, and no progress overline or step counter.
 - **Why:** Introduce the product in the approved conversational style, keep authentication visually focused, and avoid repeating onboarding during ordinary use.
 - **Consequences:** MVP completion is stored locally under a user-scoped key. Clearing browser storage or using another browser shows the introduction again; account-level synchronization can be added with profile preferences later.
 
