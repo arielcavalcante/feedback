@@ -18,6 +18,7 @@ function currentRoute() {
 const route = currentRoute();
 type Invite = { email: string; displayName: string; expiresAt: string };
 const introKey = (userId: string) => `feedback:intro-completed:${userId}`;
+const WELCOME_REVEAL_INTERVAL = 3_000;
 
 function hasCompletedIntro(userId: string) {
   try { return window.localStorage.getItem(introKey(userId)) === "1"; } catch { return false; }
@@ -116,6 +117,7 @@ function IntroAvatar({ name, imageUrl, size }: { name: string; imageUrl?: string
 function ProductIntro({ user, onComplete }: { user: CurrentUser; onComplete: () => void }) {
   const { t } = useLocale();
   const [step, setStep] = useState(0);
+  const [welcomeReveal, setWelcomeReveal] = useState(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 4 : 0);
   const [coordinatorDisplayName, setCoordinatorDisplayName] = useState("");
   const [coordinatorAvatarUrl, setCoordinatorAvatarUrl] = useState<string>();
   const last = step === 3;
@@ -133,15 +135,26 @@ function ProductIntro({ user, onComplete }: { user: CurrentUser; onComplete: () 
       .catch(() => undefined);
   }, [user.id, user.roles]);
 
+  useEffect(() => {
+    if (step !== 0) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setWelcomeReveal(4);
+      return;
+    }
+    setWelcomeReveal(0);
+    const timers = [1, 2, 3, 4].map((reveal) => window.setTimeout(() => setWelcomeReveal(reveal), reveal * WELCOME_REVEAL_INTERVAL));
+    return () => timers.forEach(window.clearTimeout);
+  }, [step]);
+
   return (
     <main id="main-content" className={`intro-screen intro-screen--step-${step} page-width`}>
       <section className="intro-stage" aria-live="polite">
         {step === 0 && (
           <div className="intro-stage__content intro-welcome">
-            <h1>{t("Hey!")}</h1>
-            <p>{t("Come on in.")}</p>
-            <p>{t("The sun was hot, right? Want a little water?")}</p>
-            <p>{t("Have a seat and don’t mind the mess. We’re just finishing up around here.")}</p>
+            <h1 className="intro-reveal">{t("Hey!")}</h1>
+            {welcomeReveal >= 1 && <p className="intro-reveal">{t("Come on in.")}</p>}
+            {welcomeReveal >= 2 && <p className="intro-reveal">{t("The sun was hot, right? Want a little water?")}</p>}
+            {welcomeReveal >= 3 && <p className="intro-reveal">{t("Have a seat and don’t mind the mess. We’re just finishing up around here.")}</p>}
           </div>
         )}
 
@@ -206,9 +219,11 @@ function ProductIntro({ user, onComplete }: { user: CurrentUser; onComplete: () 
           </div>
         )}
 
-        <button className={`intro-continue${last ? " intro-continue--final" : ""}`} type="button" onClick={() => last ? onComplete() : setStep((currentStep) => currentStep + 1)}>
-          {t("Continue")}
-        </button>
+        {(step !== 0 || welcomeReveal >= 4) && (
+          <button className={`intro-continue intro-reveal${last ? " intro-continue--final" : ""}`} type="button" onClick={() => last ? onComplete() : setStep((currentStep) => currentStep + 1)}>
+            {t("Continue")}
+          </button>
+        )}
       </section>
     </main>
   );
