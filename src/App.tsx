@@ -18,7 +18,7 @@ function currentRoute() {
 const route = currentRoute();
 type Invite = { email: string; displayName: string; expiresAt: string };
 const introKey = (userId: string) => `feedback:intro-completed:${userId}`;
-const WELCOME_REVEAL_INTERVAL = 3_000;
+const WELCOME_REVEAL_INTERVAL = 2_000;
 
 function hasCompletedIntro(userId: string) {
   try { return window.localStorage.getItem(introKey(userId)) === "1"; } catch { return false; }
