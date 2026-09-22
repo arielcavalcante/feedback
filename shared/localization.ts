@@ -6,7 +6,7 @@ export const portuguese = {
   "Preparing your workspace…": "Arrumando tudo por aqui…",
   "Our 1:1 platform": "Nossa plataforma 1x1",
   "The hand that corrects is the same one that comforts. Growth without HR nonsense.": "A mão que dá peia é a mesma que adula. Crescimento sem leruaite de RH.",
-  "Start sign in": "Fazer login",
+  "Start sign in": "Login",
   "Enter your login details": "Bote suas informações de login",
   "Having trouble? Talk to me and I’ll sort it out for you:": "Tá tendo problemas? Fala comigo que eu ajeito pra ti:",
   "Back to presentation": "Voltar pra apresentação",

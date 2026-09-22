@@ -281,7 +281,7 @@ function Login({ onLogin }: { onLogin: (user: CurrentUser) => void }) {
 
   return (
     <Shell eyebrow={t(forgot ? "Account recovery" : "")} title={t(forgot ? "Reset your password" : "Enter your login details")}>
-      <form onSubmit={submit} className="stack">
+      <form onSubmit={submit} className={forgot ? "stack" : "stack login-form"}>
         {!forgot && <p className="login-support">{t("Having trouble? Talk to me and I’ll sort it out for you:")} <a href="mailto:ino@mail.praiasertao.com.br">ino@mail.praiasertao.com.br</a></p>}
         {forgot && <p className="helper">{t("Enter your work email. If it belongs to an active account, we’ll send a short-lived reset link.")}</p>}
         <Field label={t("Work email")} type="email" value={email} onChange={setEmail} autoComplete="username" />
