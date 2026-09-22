@@ -307,7 +307,6 @@ function Login({ onLogin }: { onLogin: (user: CurrentUser) => void }) {
         <button type="button" className="text-button align-left" onClick={() => { setForgot(!forgot); setError(""); }}>
           {t(forgot ? "Back to sign in" : "Forgot your password?")}
         </button>
-        {!forgot && <button type="button" className="text-button align-left" onClick={() => setStarted(false)}>{t("Back to presentation")}</button>}
         {!forgot && <p className="helper">{t("Accounts are invitation-only. Ask an administrator if you need access.")}</p>}
       </form>
     </Shell>

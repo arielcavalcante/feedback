@@ -9,7 +9,6 @@ export const portuguese = {
   "Start sign in": "Login",
   "Enter your login details": "Bote suas informações de login",
   "Having trouble? Talk to me and I’ll sort it out for you:": "Tá tendo problemas? Fala comigo que eu ajeito pra ti:",
-  "Back to presentation": "Voltar pra apresentação",
   "A quick tour": "Rapidinho, deixa eu te mostrar",
   "Hey!": "Opa!",
   "Hey, {name}!": "Opa, {name}!",
