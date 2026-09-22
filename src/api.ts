@@ -2,6 +2,7 @@ export type CurrentUser = {
   id: string;
   email: string;
   displayName: string;
+  avatarUrl?: string;
   roles: Array<"admin" | "coordinator" | "employee">;
 };
 

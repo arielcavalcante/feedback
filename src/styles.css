@@ -108,10 +108,11 @@ p, h1, h2 { margin: 0; }
 .intro-welcome p:nth-of-type(3) { margin-top: 26px; }
 .intro-org { gap: 0; }
 .intro-org__diagram { display: grid; width: 72px; margin: 42px auto; place-items: center; }
-.intro-org__diagram span { display: block; border: 1.5px solid var(--brand-blue); border-radius: 50%; background: var(--paper); }
-.intro-org__diagram span:first-child { width: 48px; height: 48px; }
-.intro-org__diagram span:last-child { width: 64px; height: 64px; }
 .intro-org__diagram i { display: block; width: 2px; height: 28px; background: var(--orange); }
+.intro-avatar { display: grid; overflow: hidden; place-items: center; border: 1.5px solid var(--brand-blue); border-radius: 50%; background: var(--paper); color: var(--brand-blue); font-weight: 600; line-height: 1; letter-spacing: -.025em; }
+.intro-avatar--coordinator { width: 48px; height: 48px; font-size: 14px; }
+.intro-avatar--employee { width: 64px; height: 64px; font-size: 18px; }
+.intro-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .intro-org__copy { display: grid; gap: 24px; font-size: 16px; line-height: 1.4; }
 .intro-org__copy strong { font-weight: 650; }
 .intro-ratings { gap: 0; }

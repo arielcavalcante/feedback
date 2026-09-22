@@ -99,18 +99,36 @@ function Shell({ eyebrow, title, children }: { eyebrow: string; title: string; c
   );
 }
 
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  return `${parts[0][0]}${parts.length > 1 ? parts.at(-1)?.[0] ?? "" : ""}`.toLocaleUpperCase("pt-BR");
+}
+
+function IntroAvatar({ name, imageUrl, size }: { name: string; imageUrl?: string; size: "coordinator" | "employee" }) {
+  return (
+    <span className={`intro-avatar intro-avatar--${size}`}>
+      {imageUrl ? <img src={imageUrl} alt="" /> : <span aria-hidden="true">{initials(name)}</span>}
+    </span>
+  );
+}
+
 function ProductIntro({ user, onComplete }: { user: CurrentUser; onComplete: () => void }) {
   const { t } = useLocale();
   const [step, setStep] = useState(0);
-  const [coordinatorName, setCoordinatorName] = useState(t("your coordinator"));
+  const [coordinatorDisplayName, setCoordinatorDisplayName] = useState("");
+  const [coordinatorAvatarUrl, setCoordinatorAvatarUrl] = useState<string>();
   const last = step === 3;
+  const coordinatorName = coordinatorDisplayName.trim().split(/\s+/)[0] || t("your coordinator");
+  const coordinatorAvatarName = coordinatorDisplayName || t("Coordinator");
 
   useEffect(() => {
     if (!user.roles.includes("employee")) return;
     api<EmployeeDashboardData>("/api/employee/dashboard")
       .then((dashboard) => {
-        const name = dashboard.activeCycle?.coordinatorName.trim().split(/\s+/)[0];
-        if (name) setCoordinatorName(name);
+        const activeCycle = dashboard.activeCycle;
+        if (activeCycle?.coordinatorName) setCoordinatorDisplayName(activeCycle.coordinatorName);
+        if (activeCycle?.coordinatorAvatarUrl) setCoordinatorAvatarUrl(activeCycle.coordinatorAvatarUrl);
       })
       .catch(() => undefined);
   }, [user.id, user.roles]);
@@ -134,7 +152,9 @@ function ProductIntro({ user, onComplete }: { user: CurrentUser; onComplete: () 
               <p>{t("I asked around and saw you report to {name}, right?", { name: coordinatorName })}</p>
             </div>
             <div className="intro-org__diagram" role="img" aria-label={t("You and your coordinator")}>
-              <span /><i /><span />
+              <IntroAvatar name={coordinatorAvatarName} imageUrl={coordinatorAvatarUrl} size="coordinator" />
+              <i aria-hidden="true" />
+              <IntroAvatar name={user.displayName} imageUrl={user.avatarUrl} size="employee" />
             </div>
             <div className="intro-org__copy">
               <p><strong>{t("Every other Friday")}</strong> {t("you’ll tell me how things are going over there.")}</p>
@@ -402,7 +422,7 @@ function Home({ user, error }: { user: CurrentUser; error: string }) {
 }
 
 type EmployeeDashboardData = {
-  activeCycle: null | { id: string; opensAt: string; closesAt: string; teamName: string; coordinatorName: string };
+  activeCycle: null | { id: string; opensAt: string; closesAt: string; teamName: string; coordinatorName: string; coordinatorAvatarUrl?: string };
   history: Array<{ cycleId: string; opensAt: string; status: "done" | "skipped" }>;
 };
 
