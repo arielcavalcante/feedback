@@ -1,5 +1,6 @@
 import type { Env } from "./env";
 import { translate, type Locale } from "../shared/localization";
+import { EMAIL_IMAGES, type EmailImage } from "./email-assets";
 
 export type AccountEmail = {
   to: string;
@@ -20,11 +21,15 @@ export async function sendAccountEmail(env: Env, input: AccountEmail): Promise<s
     if (env.APP_ENV === "local") return "local-email-not-sent";
     throw new Error("email_not_configured");
   }
-  const { html, text } = renderAccountEmail(env.APP_ORIGIN, input);
+  // Inline (CID) images: Outlook and corporate filters often block remote images by default.
+  const { html, text } = renderAccountEmail(env.APP_ORIGIN, input, "inline");
+  const attachments = (Object.keys(EMAIL_IMAGES) as EmailImage[]).map((name) => ({
+    filename: `ino-${name}.png`, content: EMAIL_IMAGES[name], content_type: "image/png", content_id: `ino-${name}`,
+  }));
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: env.EMAIL_FROM, to: [input.to], subject: input.subject, text, html }),
+    body: JSON.stringify({ from: env.EMAIL_FROM, to: [input.to], subject: input.subject, text, html, attachments }),
   });
   if (!response.ok) throw new Error(`resend_${response.status}`);
   const payload = await response.json<{ id: string }>();
@@ -37,12 +42,12 @@ const FONT = "'Clash Grotesk', 'Helvetica Neue', Helvetica, Arial, sans-serif";
 /**
  * Table-based, inline-styled HTML that holds up in Outlook (Word engine: VML button, ghost table,
  * Arial fallback), Gmail (no <style> dependency for layout), Apple Mail (web font, dark mode), and phones.
- * Every interpolated value is escaped. Images live under /assets/email and are optional (alt text + colors).
+ * Every interpolated value is escaped. Sent emails embed images inline (CID); previews can point at /assets/email.
  */
-export function renderAccountEmail(origin: string, input: AccountEmail): { html: string; text: string } {
+export function renderAccountEmail(origin: string, input: AccountEmail, images: "inline" | "remote" = "remote"): { html: string; text: string } {
   const t = (message: string) => translate(message, input.locale);
   const e = escapeHtml;
-  const asset = (name: string) => e(`${origin}/assets/email/${name}`);
+  const asset = (name: EmailImage) => images === "inline" ? `cid:ino-${name}` : e(`${origin}/assets/email/${name}.png`);
   const url = e(input.actionUrl);
   const lang = input.locale === "en" ? "en" : "pt-BR";
   const footerTitle = t("Feedback, with care.");
@@ -122,10 +127,10 @@ export function renderAccountEmail(origin: string, input: AccountEmail): { html:
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr>
                 <td valign="bottom" style="padding:0 0 24px 0;">
-                  <a href="${e(origin)}" target="_blank" style="text-decoration:none;"><img src="${asset("logo.png")}" width="64" height="46" alt="ino" style="display:block;width:64px;height:46px;border:0;color:${COLORS.orange};font-family:${FONT};font-size:28px;font-weight:bold;"></a>
+                  <a href="${e(origin)}" target="_blank" style="text-decoration:none;"><img src="${asset("logo")}" width="64" height="46" alt="ino" style="display:block;width:64px;height:46px;border:0;color:${COLORS.orange};font-family:${FONT};font-size:28px;font-weight:bold;"></a>
                 </td>
                 <td valign="bottom" align="right" style="padding:0;">
-                  <img class="ino-sun" src="${asset("sun.png")}" width="160" height="80" alt="" style="display:block;width:160px;height:80px;border:0;">
+                  <img class="ino-sun" src="${asset("sun")}" width="160" height="80" alt="" style="display:block;width:160px;height:80px;border:0;">
                 </td>
               </tr>
             </table>
@@ -160,7 +165,7 @@ export function renderAccountEmail(origin: string, input: AccountEmail): { html:
           <td class="ino-pad" style="padding:32px 40px 0 40px;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr>
-                <td width="30" valign="top" style="width:30px;padding:4px 0 0 0;"><img src="${asset("shell.png")}" width="22" height="17" alt="" style="display:block;width:22px;height:17px;border:0;"></td>
+                <td width="30" valign="top" style="width:30px;padding:4px 0 0 0;"><img src="${asset("shell")}" width="22" height="17" alt="" style="display:block;width:22px;height:17px;border:0;"></td>
                 <td valign="top">
                   <p class="ino-foot-title" style="margin:0 0 6px 0;font-family:${FONT};font-size:20px;line-height:24px;mso-line-height-rule:exactly;font-weight:500;color:${COLORS.blue};">${e(footerTitle)}</p>
                   <p class="ino-foot" style="margin:0;font-family:${FONT};font-size:13px;line-height:20px;mso-line-height-rule:exactly;color:${COLORS.ink};">${e(privacy)}</p>
