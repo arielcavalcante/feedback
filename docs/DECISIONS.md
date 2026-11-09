@@ -191,6 +191,13 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 - **Why:** Let 1:1 conversations build on real feedback without weakening the anonymity of everyone else.
 - **Consequences:** `feedback_submissions` gains `is_signed`/`signed_at` (migration `0004`). Notes are stored as `meetings` (status `completed`) with one `meeting_outcomes` row of kind `growth_opportunity` and visibility `shared`. Anonymous answers are still never shown back to their author, to avoid pressure to prove what someone answered.
 
+## ADR-028 — Weekly notification emails and invitation delivery
+
+- **Status:** accepted (owner decision, 2026-11-09)
+- **Decision:** The scheduler enqueues three kinds of jobs in `email_jobs`, each with a unique idempotency key per type, cycle and person: Monday 09:00 "the week's check-in is open" to every participant; Friday 09:00 a differently worded reminder, sent only if the person still hasn't answered; and, at the cycle's `coordinator_email_at` (Monday 09:00 after it closes), a weekly summary to each coordinator. Monday holidays move the opening email to the next workday, Friday holidays move the reminder to the previous one. Every job is re-checked right before sending (week still open, not answered, person still active) and is otherwise cancelled. Failures retry with exponential backoff from 5 minutes, up to 5 attempts; sends are paced for Resend's rate limit. The invitation email is now sent before the invitation is saved, so a delivery failure saves nothing and the admin can retry.
+- **Privacy:** Emails go only to their recipient and never contain answers, scores, comments, or complaint text. The coordinator summary only says, per team, whether results were released or withheld, plus a generic line when there are signed check-ins or complaints to read.
+- **Consequences:** Reminder jobs reveal participation only inside the database (confidential attribution, as for submissions). Logs carry job type and error code, never recipients.
+
 ## Open questions before implementation/launch
 
 ### MVP password work factor exception — accepted 2026-09-09

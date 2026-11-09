@@ -44,9 +44,16 @@ Produção: **https://ino.praiasertao.com.br**
 - Não existe tema de liderança: sobre a coordenação, o caminho é a avaliação da semana.
 - Cada reclamação pode ser **assinada** (a coordenação vê na hora, com nome) ou **anônima** (chega na segunda, referente à semana anterior, só se pelo menos 3 pessoas diferentes reclamaram anonimamente naquela equipe). Dá pra mandar várias por semana, umas assinadas e outras não.
 
+### E-mails automáticos
+
+- **Segunda, 9h — funcionários:** "Semana nova, {nome}: tua avaliação tá aberta".
+- **Sexta, 9h — só quem ainda não respondeu:** "Ainda dá tempo, {nome} — a semana fecha domingo", com outra copy e lembrando do botão Reclamar.
+- **Segunda, 9h — coordenação:** resumo da semana que fechou, dizendo pra cada time se o resultado foi liberado ou ficou guardado, e avisando quando tem avaliação assinada ou reclamação pra ler. O e-mail nunca traz notas, comentários nem texto de reclamação: isso só aparece dentro do app.
+- Feriado na segunda empurra o e-mail pro próximo dia útil, e feriado na sexta antecipa o lembrete. Os envios passam por uma fila (`email_jobs`) que não duplica, tenta de novo em caso de falha e confere tudo de novo antes de mandar.
+
 ### Administração
 
-- Não existe cadastro público. A administração convida as pessoas por e-mail, define os **perfis** de cada uma (admin, coordenação, colaborador — dá pra ter mais de um) e a **equipe**.
+- Não existe cadastro público. A administração convida as pessoas por e-mail (se o e-mail não sair, nada é salvo e dá pra tentar de novo), define os **perfis** de cada uma (admin, coordenação, colaborador — dá pra ter mais de um) e a **equipe**.
 - Cada equipe tem uma coordenação. Quem não está numa equipe com coordenação fica fora dos ciclos.
 - Desativar uma pessoa derruba as sessões dela na hora e mantém o histórico.
 
@@ -90,7 +97,7 @@ O anonimato é a promessa central do produto. As regras completas estão em [`do
 - **Front-end:** React 19 + TypeScript + Vite, servido como assets estáticos do Worker.
 - **API:** Cloudflare Worker (`worker/`), que também é a fronteira de autorização e privacidade.
 - **Banco:** Cloudflare D1 (SQLite), schema em Drizzle (`worker/db/schema.ts`) e migrações em `drizzle/`.
-- **Agendamento:** Cron Trigger a cada 15 min. A lógica em `worker/scheduler/` cria os ciclos semanais a partir da âncora guardada no banco, abre e fecha os ciclos e inclui os participantes.
+- **Agendamento:** Cron Trigger a cada 15 min. A lógica em `worker/scheduler/` cria os ciclos semanais a partir da âncora guardada no banco, abre e fecha os ciclos, inclui os participantes e dispara os e-mails da semana (`worker/notifications.ts`).
 - **E-mail:** Resend, com template próprio compatível com Outlook (imagens embutidas por CID).
 - **Autenticação:** convite por e-mail com token opaco de uso único, senha com PBKDF2-HMAC-SHA256 + pepper e sessões em cookie `HttpOnly`/`Secure` com token guardado só como hash.
 - **Idioma:** português do Brasil por padrão, com o catálogo em inglês mantido em `shared/localization.ts` (`?lang=en` pra revisar).
@@ -159,12 +166,11 @@ pnpm run db:migrate:remote    # depois do deploy, quando houver migração nova
 - **Primeiro admin em produção:** `pnpm admin:bootstrap -- email "Nome" --remote` (ver `docs/SETUP.md`).
 - **Consultar o banco:** `pnpm exec wrangler d1 execute feedback --remote --command "SELECT ..."`. Faça um `wrangler d1 export` antes de qualquer alteração manual. Mudanças de pessoas e equipes devem ser feitas pela tela de admin, que já revoga sessões e registra auditoria.
 - **Feriados:** tabela `holidays`. Precisa ser revisada a cada ano.
-- **E-mail:** os envios aparecem no painel do Resend. O domínio de envio é `mail.praiasertao.com.br`.
+- **E-mail:** os envios aparecem no painel do Resend. O domínio de envio é `mail.praiasertao.com.br`. A fila fica na tabela `email_jobs` (`status` = `pending`, `sent`, `cancelled` ou `failed`, com `last_error_code`).
 
 ### Pendências conhecidas
 
 - MFA (TOTP) pros admins, que é pré-requisito do piloto segundo `docs/SETUP.md`.
-- E-mails de lembrete da avaliação e de aviso de resultado pronto.
 - Revisão jurídica de privacidade e retenção de dados antes de ampliar o uso.
 
 ## Documentação

@@ -14,6 +14,8 @@ export type AccountEmail = {
   body: string[];
   actionLabel: string;
   actionUrl: string;
+  /** Small print under the button. Defaults to the personal-link warning used by account emails. */
+  footnote?: string;
 };
 
 export async function sendAccountEmail(env: Env, input: AccountEmail): Promise<string> {
@@ -52,8 +54,7 @@ export function renderAccountEmail(origin: string, input: AccountEmail, images: 
   const lang = input.locale === "en" ? "en" : "pt-BR";
   const footerTitle = t("Feedback, with care.");
   const privacy = t("Survey responses are anonymous to coordinators and teammates.");
-  const ignore = t("If you did not expect this message, you can ignore it.");
-  const personal = t("This link is personal. Please don’t forward this email.");
+  const footnote = input.footnote ?? `${t("This link is personal. Please don’t forward this email.")} ${t("If you did not expect this message, you can ignore it.")}`;
   const fallback = t("If the button doesn’t work, copy this link into your browser:");
   // Pads the preview so clients don't pull body text into the inbox snippet.
   const previewPad = "&#847;&zwnj;&nbsp;".repeat(60);
@@ -157,7 +158,7 @@ export function renderAccountEmail(origin: string, input: AccountEmail, images: 
               <tr><td class="ino-rule" style="border-top:1px solid #e3e5ea;font-size:0;line-height:0;mso-line-height-rule:exactly;">&nbsp;</td></tr>
               <tr><td class="ino-muted" style="padding:20px 0 6px 0;font-family:${FONT};font-size:13px;line-height:20px;mso-line-height-rule:exactly;color:${COLORS.muted};">${e(fallback)}</td></tr>
               <tr><td class="ino-url" style="padding:0 0 16px 0;font-family:${FONT};font-size:13px;line-height:20px;mso-line-height-rule:exactly;word-break:break-all;"><a class="ino-url" href="${url}" target="_blank" style="color:${COLORS.blue};text-decoration:underline;word-break:break-all;">${url}</a></td></tr>
-              <tr><td class="ino-muted" style="padding:0;font-family:${FONT};font-size:13px;line-height:20px;mso-line-height-rule:exactly;color:${COLORS.muted};">${e(personal)} ${e(ignore)}</td></tr>
+              <tr><td class="ino-muted" style="padding:0;font-family:${FONT};font-size:13px;line-height:20px;mso-line-height-rule:exactly;color:${COLORS.muted};">${e(footnote)}</td></tr>
             </table>
           </td>
         </tr>
@@ -189,8 +190,7 @@ export function renderAccountEmail(origin: string, input: AccountEmail, images: 
     ...input.body.flatMap((paragraph) => [paragraph, ""]),
     `${input.actionLabel}: ${input.actionUrl}`,
     "",
-    personal,
-    ignore,
+    footnote,
     "",
     `— ino · ${footerTitle}`,
   ].join("\n");

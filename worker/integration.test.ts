@@ -1,37 +1,15 @@
 // End-to-end API test against the real migrations, using Node's built-in SQLite as a D1 stand-in.
-import { readdirSync, readFileSync } from "node:fs";
-import { DatabaseSync } from "node:sqlite";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import worker from "./index";
 import type { Env } from "./env";
 import { createSession } from "./auth/session";
 import { runScheduler, snapshotParticipants } from "./scheduler/run";
-
-type Params = Array<string | number | null>;
-class Statement {
-  constructor(private db: DatabaseSync, private sql: string, private params: Params = []) {}
-  bind(...params: Params) { return new Statement(this.db, this.sql, params); }
-  async first<T>() { return (this.db.prepare(this.sql).get(...this.params) as T | undefined) ?? null; }
-  async all<T>() { return { results: this.db.prepare(this.sql).all(...this.params) as T[] }; }
-  async run() { return this.runSync(); }
-  runSync() { return { meta: { changes: Number(this.db.prepare(this.sql).run(...this.params).changes) } }; }
-}
-function d1(db: DatabaseSync) {
-  return {
-    prepare: (sql: string) => new Statement(db, sql),
-    async batch(statements: Statement[]) {
-      db.exec("BEGIN");
-      try { const results = statements.map((statement) => statement.runSync()); db.exec("COMMIT"); return results; }
-      catch (error) { db.exec("ROLLBACK"); throw error; }
-    },
-  };
-}
+import { createTestDatabase } from "./testing/sqlite-d1";
 
 const origin = "http://localhost:5173";
-const db = new DatabaseSync(":memory:");
-for (const file of readdirSync("drizzle").filter((name) => name.endsWith(".sql")).sort()) db.exec(readFileSync(`drizzle/${file}`, "utf8"));
+const { db, d1 } = createTestDatabase();
 const env = {
-  DB: d1(db), APP_ORIGIN: origin, APP_ENV: "local", AUTH_PEPPER: "test-pepper", SESSION_IDLE_DAYS: "7", SESSION_ABSOLUTE_DAYS: "30",
+  DB: d1, APP_ORIGIN: origin, APP_ENV: "local", AUTH_PEPPER: "test-pepper", SESSION_IDLE_DAYS: "7", SESSION_ABSOLUTE_DAYS: "30",
   INVITATION_TTL_HOURS: "48", PASSWORD_RESET_TTL_MINUTES: "30", PASSWORD_PBKDF2_ITERATIONS: "1000",
 } as unknown as Env;
 
@@ -91,6 +69,21 @@ describe("admin organization API", () => {
     const employee = await sessionFor(employees[0]);
     const dashboard = await call<{ team: { name: string; coordinatorName: string | null }; activeCycle: unknown }>(employee, "GET", "/api/employee/dashboard");
     expect(dashboard.body.team).toEqual({ name: "Produto", coordinatorName: "Davi Holanda" });
+  });
+
+  it("saves nothing when the invitation email can't be sent", async () => {
+    const mutable = env as unknown as Record<string, string | undefined>;
+    Object.assign(mutable, { RESEND_API_KEY: "re_test", EMAIL_FROM: "ino <ino@mail.praiasertao.com.br>" });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 500 }));
+    try {
+      const result = await call<{ error: { code: string } }>(admin, "POST", "/api/admin/invitations", { email: "falhou@example.com", displayName: "Falhou Envio", roles: ["employee"] });
+      expect(result.status).toBe(502);
+      expect(result.body.error.code).toBe("email_failed");
+      expect(db.prepare("SELECT COUNT(*) AS n FROM users WHERE email = 'falhou@example.com'").get()).toEqual({ n: 0 });
+    } finally {
+      fetchMock.mockRestore();
+      mutable.RESEND_API_KEY = undefined; mutable.EMAIL_FROM = undefined;
+    }
   });
 
   it("forbids non-admins", async () => {

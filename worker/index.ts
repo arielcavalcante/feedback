@@ -161,22 +161,29 @@ async function handleCreateInvitation(request: Request, env: Env): Promise<Respo
     ...roleStatements(env, userId, roleKeys, actor.id, now.toISOString()),
     ...(teamId !== undefined ? membershipStatements(env, userId, teamId, actor.id, now.toISOString()) : []),
   ];
-  await env.DB.batch(statements);
   const actionUrl = `${env.APP_ORIGIN}/accept-invite#token=${encodeURIComponent(token)}`;
-  await sendAccountEmail(env, {
-    to: email,
-    locale,
-    subject: translate("Your invitation to ino", locale),
-    preheader: translate("Create your password and come on in.", locale),
-    eyebrow: translate("Your invitation", locale),
-    heading: translate("Hello, {name}", locale, { name: displayName.split(/\s+/)[0] }),
-    body: [
-      translate("You’re invited to ino. Here the team shares feedback every week, whenever they want — and coordination only ever sees the group’s results.", locale),
-      translate("Create your password by {date}. Use at least 15 characters — a sentence works well.", locale, { date: formatDate(expiresAt, locale) }),
-    ],
-    actionLabel: translate("Create account", locale),
-    actionUrl,
-  });
+  // Send first: if Resend refuses, nothing is saved and the admin sees a clear error instead of a
+  // person marked "invite sent" who never got an email.
+  try {
+    await sendAccountEmail(env, {
+      to: email,
+      locale,
+      subject: translate("Your invitation to ino", locale),
+      preheader: translate("Create your password and come on in.", locale),
+      eyebrow: translate("Your invitation", locale),
+      heading: translate("Hello, {name}", locale, { name: displayName.split(/\s+/)[0] }),
+      body: [
+        translate("You’re invited to ino. Here the team shares feedback every week, whenever they want — and coordination only ever sees the group’s results.", locale),
+        translate("Create your password by {date}. Use at least 15 characters — a sentence works well.", locale, { date: formatDate(expiresAt, locale) }),
+      ],
+      actionLabel: translate("Create account", locale),
+      actionUrl,
+    });
+  } catch (error) {
+    console.error(JSON.stringify({ event: "invitation_delivery_failed", code: error instanceof Error ? error.message : "unknown" }));
+    throw new HttpError(502, "email_failed", "We couldn’t send the invitation email, so nothing was saved. Try again in a moment.");
+  }
+  await env.DB.batch(statements);
   await audit(env, actor.id, "account.invitation_created", "user", userId, "success");
   return json({ invitation: { userId, email, expiresAt, ...(env.APP_ENV === "local" ? { actionUrl } : {}) } }, { status: 201 });
 }
