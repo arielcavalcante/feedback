@@ -15,6 +15,20 @@
       "when": 1788884350215,
       "tag": "0001_futuristic_blazing_skull",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794246530476,
+      "tag": "0002_round_redwing",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1794246531551,
+      "tag": "0003_weekly_schedule",
+      "breakpoints": true
     }
   ]
 }

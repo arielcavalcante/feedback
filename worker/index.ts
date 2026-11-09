@@ -8,7 +8,8 @@ import { handleAdminCreateTeam, handleAdminTeams, handleAdminUpdateTeam, handleA
 import { handleCoordinatorDashboard } from "./coordinator";
 import { sendAccountEmail } from "./email";
 import { assertSameOrigin, HttpError, json, readJson } from "./http";
-import { runScheduler } from "./scheduler/run";
+import { runScheduler, snapshotParticipants } from "./scheduler/run";
+import { currentTeam, handleSubmitComplaint } from "./complaints";
 import { formatDate, requestLocale, translate } from "../shared/localization";
 
 const API_ERROR = "The email or password is incorrect.";
@@ -35,6 +36,7 @@ export default {
       if (request.method === "POST" && url.pathname === "/api/auth/password-reset/accept") return await handleResetAccept(request, env);
       if (request.method === "POST" && url.pathname === "/api/admin/invitations") return await handleCreateInvitation(request, env);
       if (request.method === "GET" && url.pathname === "/api/employee/dashboard") return await handleEmployeeDashboard(request, env);
+      if (request.method === "POST" && url.pathname === "/api/employee/complaints") return await handleSubmitComplaint(request, env);
       if (request.method === "GET" && url.pathname === "/api/coordinator/dashboard") return await handleCoordinatorDashboard(request, env);
       if (request.method === "GET" && url.pathname === "/api/admin/users") return await handleAdminUsers(request, env);
       if (request.method === "GET" && url.pathname === "/api/admin/teams") return await handleAdminTeams(request, env);
@@ -163,7 +165,7 @@ async function handleCreateInvitation(request: Request, env: Env): Promise<Respo
     eyebrow: translate("Your invitation", locale),
     heading: translate("Hello, {name}", locale, { name: displayName.split(/\s+/)[0] }),
     body: [
-      translate("You’re invited to ino. Here the team shares feedback every other Friday — and coordination only ever sees the group’s results.", locale),
+      translate("You’re invited to ino. Here the team shares feedback every week, whenever they want — and coordination only ever sees the group’s results.", locale),
       translate("Create your password by {date}. Use at least 15 characters — a sentence works well.", locale, { date: formatDate(expiresAt, locale) }),
     ],
     actionLabel: translate("Create account", locale),
@@ -242,6 +244,8 @@ type EmployeeCycleRow = {
 async function handleEmployeeDashboard(request: Request, env: Env): Promise<Response> {
   const user = await requireRole(request, env, "employee");
   const now = new Date().toISOString();
+  const schedules = await env.DB.prepare("SELECT id FROM feedback_schedules WHERE is_active = 1").all<{ id: string }>();
+  if (schedules.results.length) await env.DB.batch(schedules.results.map((schedule) => snapshotParticipants(env, schedule.id, now)));
   const rows = await env.DB.prepare(`SELECT c.id AS cycleId, c.opens_at AS opensAt, c.closes_at AS closesAt,
       c.status AS cycleStatus, t.name AS teamName, coordinator.display_name AS coordinatorName,
       s.id AS submissionId
@@ -255,21 +259,17 @@ async function handleEmployeeDashboard(request: Request, env: Env): Promise<Resp
     ORDER BY c.opens_at DESC`).bind(user.id, now).all<EmployeeCycleRow>();
 
   const activeRow = rows.results.find((row) => row.cycleStatus === "open" && row.opensAt <= now && row.closesAt > now && !row.submissionId);
+  const answeredThisWeek = rows.results.some((row) => row.cycleStatus === "open" && row.opensAt <= now && row.closesAt > now && row.submissionId);
   const history = rows.results
     .filter((row) => row.closesAt <= now || row.cycleStatus === "closed" || row.cycleStatus === "reported")
     .map((row) => ({ cycleId: row.cycleId, opensAt: row.opensAt, status: row.submissionId ? "done" as const : "skipped" as const }));
 
   // Current team and coordination, independent of any cycle (used by the introduction's org chart).
-  const team = await env.DB.prepare(`SELECT t.name AS name, coordinator.display_name AS coordinatorName
-    FROM team_members tm
-    JOIN teams t ON t.id = tm.team_id AND t.is_active = 1
-    LEFT JOIN team_coordinators tc ON tc.id = (SELECT c.id FROM team_coordinators c WHERE c.team_id = tm.team_id AND c.ends_at IS NULL ORDER BY c.is_primary DESC, c.starts_at LIMIT 1)
-    LEFT JOIN users coordinator ON coordinator.id = tc.user_id AND coordinator.is_active = 1
-    WHERE tm.user_id = ? AND tm.ends_at IS NULL
-    ORDER BY tm.starts_at DESC LIMIT 1`).bind(user.id).first<{ name: string; coordinatorName: string | null }>();
+  const team = await currentTeam(env, user.id);
 
   return json({
-    team: team ? { name: team.name, coordinatorName: team.coordinatorName ?? null } : null,
+    team: team ? { name: team.teamName, coordinatorName: team.coordinatorName ?? null } : null,
+    answeredThisWeek,
     activeCycle: activeRow ? {
       id: activeRow.cycleId,
       opensAt: activeRow.opensAt,

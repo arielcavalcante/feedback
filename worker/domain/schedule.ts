@@ -4,8 +4,9 @@ export type ScheduleDefinition = { anchorOpenLocalDate: string; intervalDays: nu
 export function cycleTiming(schedule: ScheduleDefinition, sequenceNumber: number, holidays: ReadonlySet<string>): CycleTiming {
   if (!Number.isInteger(sequenceNumber) || sequenceNumber < 0) throw new Error("Sequence number must be a non-negative integer");
   const openLocalDate = addLocalDays(schedule.anchorOpenLocalDate, schedule.intervalDays * sequenceNumber);
-  const closeLocalDate = addLocalDays(openLocalDate, 2);
-  const reportLocalDate = addLocalDays(openLocalDate, 3);
+  // A cycle stays open for its whole interval (e.g. Monday → Sunday) and reports the next day.
+  const closeLocalDate = addLocalDays(openLocalDate, schedule.intervalDays - 1);
+  const reportLocalDate = addLocalDays(openLocalDate, schedule.intervalDays);
   const employeeEmailLocalDate = previousOrSameWorkday(openLocalDate, holidays);
   const coordinatorEmailLocalDate = nextOrSameWorkday(reportLocalDate, holidays);
   return { sequenceNumber, openLocalDate, closeLocalDate, reportLocalDate, employeeEmailLocalDate, coordinatorEmailLocalDate,

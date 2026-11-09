@@ -6,7 +6,7 @@ Development has started. The repository now contains a React/Worker foundation, 
 
 ## Product overview
 
-Every 14 days, employees receive a short survey about their coordinator, team, and work. A cycle opens Friday at 09:00 and closes Sunday at 23:59 in `America/Fortaleza`; eligible coordinator reports are sent Monday at 09:00. Coordinators use anonymous, aggregated signals in team dashboards and in meeting preparation. Employees can review meeting outcomes and a simple history of whether they completed or skipped each past cycle, but never their survey answers or scores.
+Every week, employees can answer a short check-in about their coordinator, team, and work at any time between Monday 00:00 and Sunday 23:59 in `America/Fortaleza`; eligible coordinator results are released Monday at 09:00. A **Reclamar** (complain) button is always available for topics other than leadership (equipment, software, colleagues, working conditions, and more), signed or anonymous. Coordinators use anonymous, aggregated signals in team dashboards and in meeting preparation. Employees can review meeting outcomes and a simple history of whether they completed or skipped each past cycle, but never their survey answers or scores.
 
 ## Architecture
 
@@ -43,9 +43,9 @@ See [docs/PRIVACY.md](docs/PRIVACY.md) for the enforceable rules and threat mode
 
 ## Feedback cycle
 
-1. A due cycle opens Friday at 09:00 `America/Fortaleza`.
+1. A weekly cycle opens Monday at 00:00 `America/Fortaleza` and stays open all week.
 2. Eligible employees submit quantitative CSAT answers for coordinator, team, and work, with optional qualitative text/topics.
-3. The cycle closes Sunday at 23:59:59 local time. Missing eligible submissions become `skipped` for history/reporting.
+3. The cycle closes Sunday at 23:59:59 local time. Missing eligible submissions become `skipped` for history/reporting. People added to a team mid-week join that week's cycle.
 4. Monday at 09:00 local time, a coordinator report job is queued. Results are shown only when the anonymity threshold is met.
 5. Future cycles are computed schedules, not stored employee history rows. The employee grid renders one square per past cycle with exactly `done` or `skipped`.
 

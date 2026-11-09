@@ -7,6 +7,7 @@ import { ErrorMessage, errorText, Field, initials, Primary } from "./components/
 import { CoordinatorSection } from "./views/CoordinatorSection";
 import { AdminSection } from "./views/AdminSection";
 import { AboutPage } from "./views/AboutPage";
+import { ComplaintForm } from "./views/ComplaintForm";
 import type { EmployeeDashboardData } from "./types";
 
 function currentRoute() {
@@ -122,12 +123,18 @@ function IntroAvatar({ name, imageUrl, size }: { name: string; imageUrl?: string
 }
 
 function ProductIntro({ user, onComplete }: { user: CurrentUser; onComplete: () => void }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [step, setStep] = useState(0);
   const [welcomeReveal, setWelcomeReveal] = useState(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 4 : 0);
   const [coordinatorDisplayName, setCoordinatorDisplayName] = useState("");
   const [coordinatorAvatarUrl, setCoordinatorAvatarUrl] = useState<string>();
   const last = step === 3;
+  // Example cards use real Mondays around today so the weekly rhythm reads naturally.
+  const exampleWeek = (offset: number) => {
+    const now = new Date();
+    const monday = new Date(now.getTime() + (offset * 7 - ((now.getDay() + 6) % 7)) * 86_400_000);
+    return new Intl.DateTimeFormat(locale === "en" ? "en-US" : "pt-BR", { day: "2-digit", month: "short" }).format(monday).replace(".", "").toLocaleUpperCase(locale);
+  };
   const coordinatorName = coordinatorDisplayName.trim().split(/\s+/)[0] || t("your coordinator");
   const coordinatorAvatarName = coordinatorDisplayName || t("Coordinator");
 
@@ -180,8 +187,9 @@ function ProductIntro({ user, onComplete }: { user: CurrentUser; onComplete: () 
               <IntroAvatar name={user.displayName} imageUrl={user.avatarUrl} size="employee" />
             </div>
             <div className="intro-org__copy">
-              <p><strong>{t("Every other Friday")}</strong> {t("you’ll tell me how things are going over there.")}</p>
+              <p><strong>{t("Every week")}</strong> {t("you’ll tell me how things are going over there — whenever you want, Monday to Sunday.")}</p>
               <p>{t("Whether {name} has been helping you, whether your teammates have been treating you well, whether you’ve been working like crazy — that kind of thing.", { name: coordinatorName })}</p>
+              <p>{t("And if something is bugging you — your machine, software, the heat, a coworker — there’s a Complain button, open all the time.")}</p>
             </div>
           </div>
         )}
@@ -207,22 +215,22 @@ function ProductIntro({ user, onComplete }: { user: CurrentUser; onComplete: () 
           <div className="intro-stage__content intro-history">
             <div>
               <h1>{t("Your ratings")}</h1>
-              <p>{t("Here you can quickly see which feedback cycles you joined and when the next one is.")}</p>
+              <p>{t("Here you can quickly see which weeks you answered and when the next one opens.")}</p>
             </div>
             <div className="intro-history__cards" aria-label={t("Example feedback history")}>
               <article className="intro-history-card intro-history-card--next">
                 <img src="/assets/icons/ellipsis.svg" alt="" aria-hidden="true" />
-                <time>{t("SEP 25")}</time>
-                <strong>{t("Next feedback")}</strong>
+                <time>{exampleWeek(1)}</time>
+                <strong>{t("Next week")}</strong>
               </article>
               <article className="intro-history-card intro-history-card--skipped">
                 <img src="/assets/icons/dash.svg" alt="" aria-hidden="true" />
-                <time>{t("SEP 11")}</time>
+                <time>{exampleWeek(-1)}</time>
                 <strong>{t("Not answered")}</strong>
               </article>
               <article className="intro-history-card intro-history-card--done">
                 <img src="/assets/icons/check.svg" alt="" aria-hidden="true" />
-                <time>{t("AUG 28")}</time>
+                <time>{exampleWeek(-2)}</time>
                 <strong>{t("Completed")}</strong>
               </article>
             </div>
@@ -425,7 +433,7 @@ function Home({ user, error }: { user: CurrentUser; error: string }) {
   const primary = roles[0];
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const firstName = user.displayName.trim().split(/\s+/)[0];
-  const status = primary === "employee" ? (feedbackOpen ? "Feedback open today" : "Your feedback space") : primary ? HERO_COPY[primary].status : "Workspace ready";
+  const status = primary === "employee" ? (feedbackOpen ? "This week’s check-in is waiting" : "Your feedback space") : primary ? HERO_COPY[primary].status : "Workspace ready";
   const lead = primary === "employee" ? "A few honest minutes today can make the next conversation better." : primary ? HERO_COPY[primary].lead : "Your account doesn’t have an access profile yet. Ask an administrator.";
 
   return (
@@ -447,11 +455,12 @@ function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: 
   const { t, locale } = useLocale();
   const [dashboard, setDashboard] = useState<EmployeeDashboardData | null>(null);
   const [loadError, setLoadError] = useState("");
-  const [surveyOpen, setSurveyOpen] = useState(false);
+  const [mode, setMode] = useState<"idle" | "survey" | "complaint">("idle");
   const [ratings, setRatings] = useState({ coordinator: 0, team: 0, work: 0 });
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [notice, setNotice] = useState("");
+  const surveyOpen = mode === "survey";
 
   async function loadDashboard() {
     try {
@@ -476,8 +485,8 @@ function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: 
         method: "POST",
         body: JSON.stringify({ cycleId: dashboard.activeCycle.id, ...ratings, comment }),
       });
-      setSubmitted(true);
-      setSurveyOpen(false);
+      setNotice(t("Check-in sent. Thanks for taking the time."));
+      setMode("idle");
       await loadDashboard();
     } catch (caught) {
       setLoadError(errorText(caught, "Unable to send your feedback."));
@@ -489,30 +498,48 @@ function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: 
   const date = (value: string, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(locale === "en" ? "en-US" : "pt-BR", {
     timeZone: "America/Fortaleza", ...options,
   }).format(new Date(value));
+  const coordinatorName = dashboard?.team?.coordinatorName ?? null;
 
   return (
     <div className="dashboard-layout">
       <section className="active-feedback" id="active-feedback" aria-labelledby="active-feedback-title">
-        {submitted && <p className="success" role="status">{t("Feedback sent. Thank you for taking the time.")}</p>}
+        {notice && mode === "idle" && <p className="success" role="status">{notice}</p>}
         {!dashboard ? (
           <p role="status">{t("Loading your feedback cycles…")}</p>
-        ) : dashboard.activeCycle ? (
+        ) : mode === "complaint" && coordinatorName ? (
+          <ComplaintForm
+            coordinatorName={coordinatorName}
+            onCancel={() => setMode("idle")}
+            onSent={(signed) => {
+              setNotice(signed
+                ? t("Complaint sent to {name}.", { name: coordinatorName })
+                : t("Complaint saved. It reaches coordination on Monday if at least 3 people complained this week."));
+              setMode("idle");
+            }}
+          />
+        ) : (
           <>
             <div className="section-heading">
-              <div><p className="eyebrow">{t("Today")}</p><h2 id="active-feedback-title">{t("Your feedback is waiting")}</h2></div>
-              <span className="status-pill status-pill--pending">{t("Pending")}</span>
+              <div>
+                <p className="eyebrow">{t("This week")}</p>
+                <h2 id="active-feedback-title">{t(dashboard.activeCycle ? "How was your week?" : dashboard.answeredThisWeek ? "Check-in done" : "No check-in for you this week")}</h2>
+              </div>
+              {dashboard.activeCycle && <span className="status-pill status-pill--pending">{t("Pending")}</span>}
+              {!dashboard.activeCycle && dashboard.answeredThisWeek && <span className="status-pill status-pill--ready">{t("Done")}</span>}
             </div>
-            <p className="active-feedback__intro">{t("Think about the last two weeks. Your answers are confidential and shown only in anonymous group results.")}</p>
-            <dl className="cycle-meta">
-              <div><dt>{t("Team")}</dt><dd>{dashboard.activeCycle.teamName}</dd></div>
-              <div><dt>{t("Coordinator")}</dt><dd>{dashboard.activeCycle.coordinatorName}</dd></div>
-              <div><dt>{t("Closes")}</dt><dd>{date(dashboard.activeCycle.closesAt, { weekday: "long", hour: "2-digit", minute: "2-digit" })}</dd></div>
-            </dl>
-            {!surveyOpen ? (
-              <button className="case-link primary dashboard-action" onClick={() => setSurveyOpen(true)}>
-                <span>{t("Answer now")}</span><span className="case-link__icon" aria-hidden="true" />
-              </button>
-            ) : (
+            <p className="active-feedback__intro">{t(dashboard.activeCycle
+              ? "Rate your coordinator, your team and your work whenever you want until Sunday night. Your answers only show up together with the group’s."
+              : dashboard.answeredThisWeek
+                ? "A new check-in opens on Monday. Meanwhile, if something is bugging you, you can complain anytime."
+                : "You’ll get a weekly check-in once you’re on a team with a coordinator.")}</p>
+            {dashboard.activeCycle && (
+              <dl className="cycle-meta">
+                <div><dt>{t("Team")}</dt><dd>{dashboard.activeCycle.teamName}</dd></div>
+                <div><dt>{t("Coordinator")}</dt><dd>{dashboard.activeCycle.coordinatorName}</dd></div>
+                <div><dt>{t("Open until")}</dt><dd>{date(dashboard.activeCycle.closesAt, { weekday: "long", hour: "2-digit", minute: "2-digit" })}</dd></div>
+              </dl>
+            )}
+            {surveyOpen && dashboard.activeCycle ? (
               <form className="survey-form" onSubmit={submit}>
                 <p className="survey-form__hint">{t("1 means very dissatisfied; 5 means very satisfied.")}</p>
                 <RatingField label={t("How do you feel about your coordinator?")} value={ratings.coordinator} onChange={(value) => setRatings({ ...ratings, coordinator: value })} />
@@ -521,14 +548,25 @@ function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: 
                 <label className="comment-field"><span>{t("Anything else you’d like to share? (optional)")}</span><textarea value={comment} maxLength={2000} onChange={(event) => setComment(event.target.value)} /></label>
                 <ErrorMessage message={loadError} />
                 <Primary busy={busy} disabled={Object.values(ratings).some((rating) => rating === 0)}>{t(busy ? "Sending feedback…" : "Send feedback")}</Primary>
-                <button type="button" className="text-button align-left" onClick={() => setSurveyOpen(false)}>{t("Answer later")}</button>
+                <button type="button" className="text-button align-left" onClick={() => setMode("idle")}>{t("Answer later")}</button>
               </form>
+            ) : (
+              <div className="action-row">
+                {dashboard.activeCycle && (
+                  <button className="case-link primary" type="button" onClick={() => { setNotice(""); setMode("survey"); }}>
+                    <span>{t("Answer now")}</span><span className="case-link__icon" aria-hidden="true" />
+                  </button>
+                )}
+                {coordinatorName && (
+                  <button className={`case-link ${dashboard.activeCycle ? "secondary" : "primary"}`} type="button" onClick={() => { setNotice(""); setMode("complaint"); }}>
+                    <span>{t("Complain")}</span><span className="case-link__icon" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
             )}
           </>
-        ) : (
-          <div className="all-done"><span className="all-done__mark" aria-hidden="true">✓</span><div><p className="eyebrow">{t("All done")}</p><h2 id="active-feedback-title">{t("Nothing pending today")}</h2><p>{t("We’ll let you know when the next feedback cycle opens.")}</p></div></div>
         )}
-        {!surveyOpen && <ErrorMessage message={loadError} />}
+        {mode === "idle" && <ErrorMessage message={loadError} />}
       </section>
 
       <section className="cycle-history" id="history" aria-labelledby="history-title">

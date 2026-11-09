@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { useLocale } from "../i18n";
 import { ErrorMessage, errorText, formatInZone } from "../components/ui";
-import type { CoordinatorDashboardData, CoordinatorTeam, DimensionAverages } from "../types";
+import type { CoordinatorComplaints, CoordinatorDashboardData, CoordinatorTeam, DimensionAverages } from "../types";
+import { COMPLAINT_TOPICS } from "../../shared/complaints";
 
 const DIMENSIONS: Array<{ key: keyof DimensionAverages; label: string }> = [
   { key: "coordinator", label: "Coordinator" },
@@ -51,6 +52,7 @@ function TeamResults({ team, nextCycle, anchor, showName }: { team: CoordinatorT
   const latest = team.latest;
 
   return (
+    <>
     <div className="dashboard-layout">
       <section className="active-feedback" id={anchor ? "team-results" : undefined} aria-labelledby={titleId}>
         {latest?.status === "ready"
@@ -91,6 +93,62 @@ function TeamResults({ team, nextCycle, anchor, showName }: { team: CoordinatorT
         </div>
       </section>
     </div>
+    <ComplaintsPanel complaints={team.complaints} titleId={`${titleId}-complaints`} anchor={anchor} />
+    </>
+  );
+}
+
+function ComplaintsPanel({ complaints, titleId, anchor }: { complaints: CoordinatorComplaints; titleId: string; anchor: boolean }) {
+  const { t, locale } = useLocale();
+  const week = (weekStart: string) => t("Week of {date}", { date: formatInZone(`${weekStart}T12:00:00.000Z`, locale, { day: "numeric", month: "short" }) });
+  const topicLabel = (key: string) => t(COMPLAINT_TOPICS.find((topic) => topic.key === key)?.label ?? key);
+  const empty = !complaints.signed.length && !complaints.anonymousWeeks.length && !complaints.withheldWeeks.length;
+  const Topics = ({ keys }: { keys: string[] }) => <div className="complaint-card__topics">{keys.map((key) => <span key={key}>{topicLabel(key)}</span>)}</div>;
+
+  return (
+    <section className="complaints-panel" id={anchor ? "team-complaints" : undefined} aria-labelledby={titleId}>
+      <div className="section-heading">
+        <div><p className="eyebrow">{t("Complaints")}</p><h2 id={titleId}>{t("What the team is complaining about")}</h2></div>
+      </div>
+      <p className="active-feedback__intro">{t("Signed complaints show up right away. Anonymous ones arrive every Monday for the previous week, only when at least 3 people complained — never with names.")}</p>
+
+      {empty && <p className="helper complaints-panel__empty">{t("No complaints in the last few weeks.")}</p>}
+
+      {complaints.signed.length > 0 && (
+        <div className="complaints-group">
+          <h3>{t("Signed")}</h3>
+          <ul className="complaint-list">
+            {complaints.signed.map((item) => (
+              <li className="complaint-card" key={item.id}>
+                <Topics keys={item.topics} />
+                <blockquote>{item.body}</blockquote>
+                <p className="complaint-card__by">{item.authorName} · {week(item.weekStart)}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {complaints.anonymousWeeks.map((group) => (
+        <div className="complaints-group" key={group.weekStart}>
+          <h3>{week(group.weekStart)} · {t("anonymous")}</h3>
+          <ul className="complaint-list">
+            {group.items.map((item) => (
+              <li className="complaint-card complaint-card--anonymous" key={item.id}>
+                <Topics keys={item.topics} />
+                <blockquote>{item.body}</blockquote>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+
+      {complaints.withheldWeeks.length > 0 && (
+        <p className="helper complaints-panel__withheld">
+          {t("Kept private (fewer than 3 people complained anonymously): {weeks}", { weeks: complaints.withheldWeeks.map(week).join(", ") })}
+        </p>
+      )}
+    </section>
   );
 }
 

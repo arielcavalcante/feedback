@@ -58,7 +58,7 @@ function DevRoleBar({ state }: { state: DevState }) {
       {state.signedIn && state.role === "employee" && (
         <label className="ino-dev-bar__toggle">
           <input type="checkbox" checked={state.cycleOpen} onChange={(event) => devStore.navigate({ cycleOpen: event.target.checked, submitted: false })} />
-          Ciclo aberto
+          Avaliação pendente
         </label>
       )}
       {state.signedIn && state.role === "coordinator" && (

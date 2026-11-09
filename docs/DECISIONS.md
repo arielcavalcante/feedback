@@ -177,6 +177,13 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 - **Why:** Few people will visit it, so it can be expressive while keeping body copy highly readable (≈60-character lines, 1.55 leading).
 - **Consequences:** Its copy lives in `src/views/AboutPage.tsx` per locale instead of the UI catalog. Motion respects `prefers-reduced-motion`.
 
+## ADR-026 — Weekly always-open check-ins and complaints ("Reclamar")
+
+- **Status:** accepted (owner decision, 2026-11-09)
+- **Decision:** Cycles are weekly and open all week (Monday 00:00 → Sunday 23:59:59 `America/Fortaleza`), reporting Monday 09:00; the survey keeps its three ratings. Eligibility is re-evaluated on every scheduler tick and when an employee opens the home page, so people who join a team mid-week enter that week's cycle; nobody is added twice and existing snapshots never change. Employees can also send complaints at any time, choosing one or more of ten topics (no leadership topic: feedback about coordination goes through the survey) and an unbounded text (server cap 50,000 characters). Each complaint is addressed to the author's current team and its coordinator.
+- **Privacy:** The author may sign. Signed complaints are shown to the coordinator immediately with the author's name. Anonymous complaints are shown only after the week's report time (next Monday 09:00) and only when at least 3 distinct people complained anonymously in that team that week; they are shown without author, time, or order (random ids), and withheld weeks are listed without counts. The author id is stored confidentially for counting and abuse handling; the audit event for a complaint has no resource id so it cannot link a person to a complaint.
+- **Consequences:** Admins have no complaint view. Below-threshold anonymous complaints never reach anyone; signing is the way to be heard about a one-person issue.
+
 ## Open questions before implementation/launch
 
 ### MVP password work factor exception — accepted 2026-09-09

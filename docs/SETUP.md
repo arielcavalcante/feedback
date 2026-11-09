@@ -46,7 +46,7 @@ The owner approved 100,000 PBKDF2-HMAC-SHA256 iterations for the six-person MVP,
 
 ## 6. Feedback schedule and holidays
 
-Accepted anchor: Friday, September 18, 2026 at 09:00 `America/Fortaleza`, repeating every 14 days. Survey open/close dates do not move for holidays.
+Accepted anchor (since 2026-11-09, ADR-026): Monday, November 9, 2026 at 00:00 `America/Fortaleza`, repeating every 7 days; each cycle closes Sunday 23:59:59 and reports Monday 09:00. The original biweekly Friday schedule (anchor 2026-09-18) is retired by migration `0003_weekly_schedule`. Survey open/close dates do not move for holidays.
 
 - If opening Friday is a Fortaleza work holiday, the employee email moves to the previous workday at 09:00.
 - If report Monday is a Fortaleza work holiday, the coordinator email moves to the next workday at 09:00.

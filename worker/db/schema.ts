@@ -235,3 +235,22 @@ export const auditLogs = sqliteTable("audit_logs", {
 }, (table) => [index("audit_logs_occurred_idx").on(table.occurredAt)]);
 
 export const schemaChecks = { minimumThreshold: sql`anonymity_threshold >= 3` };
+
+// "Reclamar": always-available complaints. The author is kept confidentially (threshold counting, abuse);
+// coordinators only see it when the author chose to sign (ADR-026).
+export const complaints = sqliteTable("complaints", {
+  id: text("id").primaryKey(),
+  authorUserId: text("author_user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  teamId: text("team_id").notNull().references(() => teams.id, { onDelete: "restrict" }),
+  coordinatorUserId: text("coordinator_user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  weekStartLocalDate: text("week_start_local_date").notNull(),
+  releaseAt: text("release_at").notNull(),
+  body: text("body").notNull(),
+  isSigned: integer("is_signed", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").notNull(),
+}, (table) => [index("complaints_coordinator_week_idx").on(table.coordinatorUserId, table.teamId, table.weekStartLocalDate)]);
+
+export const complaintTopics = sqliteTable("complaint_topics", {
+  complaintId: text("complaint_id").notNull().references(() => complaints.id, { onDelete: "restrict" }),
+  topicKey: text("topic_key").notNull(),
+}, (table) => [primaryKey({ columns: [table.complaintId, table.topicKey] })]);

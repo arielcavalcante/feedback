@@ -10,25 +10,26 @@ async function ensureCycle(env: Env, schedule: ScheduleRow, sequence: number, ho
 async function transitionDueCycles(env: Env, scheduleId: string, now: string): Promise<void> { await env.DB.batch([env.DB.prepare("UPDATE feedback_cycles SET status = 'open', opened_at = ? WHERE schedule_id = ? AND status = 'scheduled' AND opens_at <= ? AND closes_at > ?").bind(now, scheduleId, now, now), snapshotParticipants(env, scheduleId, now), env.DB.prepare("UPDATE feedback_cycles SET status = 'closed', closed_at = ? WHERE schedule_id = ? AND status = 'open' AND closes_at <= ?").bind(now, scheduleId, now), env.DB.prepare("UPDATE feedback_cycles SET status = 'reported', reported_at = ? WHERE schedule_id = ? AND status = 'closed' AND report_at <= ?").bind(now, scheduleId, now)]); }
 
 /**
- * Eligibility snapshot for cycles that are open and still have no participants (idempotent and retry-safe):
- * active employees with a current team membership that started before the cycle opened, assigned to the
- * team's current primary coordinator. Later team changes never alter an existing snapshot.
+ * Participants of open cycles (idempotent, runs on every scheduler tick): active employees with a current
+ * membership in an active team that has a coordinator. Cycles are open all week, so someone who joins a team
+ * mid-week is added to that week's cycle; nobody is ever added twice to the same cycle, and existing
+ * participants keep their original team/coordinator snapshot (ADR-026).
  */
 export function snapshotParticipants(env: Env, scheduleId: string, now: string): D1PreparedStatement {
   return env.DB.prepare(`INSERT INTO feedback_cycle_participants (id, cycle_id, employee_user_id, team_id, coordinator_user_id, eligibility_status, created_at)
     SELECT lower(hex(randomblob(16))), c.id, tm.user_id, tm.team_id, tc.user_id, 'eligible', ?
     FROM feedback_cycles c
-    JOIN team_members tm ON tm.starts_at <= c.opens_at AND (tm.ends_at IS NULL OR tm.ends_at > c.opens_at)
+    JOIN team_members tm ON tm.starts_at <= ? AND tm.ends_at IS NULL
     JOIN teams t ON t.id = tm.team_id AND t.is_active = 1
     JOIN users u ON u.id = tm.user_id AND u.is_active = 1
     JOIN team_coordinators tc ON tc.id = (
       SELECT candidate.id FROM team_coordinators candidate
-      WHERE candidate.team_id = tm.team_id AND candidate.starts_at <= c.opens_at AND (candidate.ends_at IS NULL OR candidate.ends_at > c.opens_at)
+      WHERE candidate.team_id = tm.team_id AND candidate.ends_at IS NULL
       ORDER BY candidate.is_primary DESC, candidate.starts_at LIMIT 1)
-    WHERE c.schedule_id = ? AND c.status = 'open'
-      AND NOT EXISTS (SELECT 1 FROM feedback_cycle_participants existing WHERE existing.cycle_id = c.id)
+    WHERE c.schedule_id = ? AND c.status = 'open' AND c.closes_at > ?
+      AND NOT EXISTS (SELECT 1 FROM feedback_cycle_participants existing WHERE existing.cycle_id = c.id AND existing.employee_user_id = tm.user_id)
       AND tc.user_id != tm.user_id
       AND EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id
         WHERE ur.user_id = tm.user_id AND ur.revoked_at IS NULL AND r.key = 'employee')
-    ON CONFLICT(cycle_id, employee_user_id, team_id) DO NOTHING`).bind(now, scheduleId);
+    ON CONFLICT(cycle_id, employee_user_id, team_id) DO NOTHING`).bind(now, now, scheduleId, now);
 }

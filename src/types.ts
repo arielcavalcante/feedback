@@ -5,6 +5,7 @@ export type RoleKey = CurrentUser["roles"][number];
 
 export type EmployeeDashboardData = {
   team: null | { name: string; coordinatorName: string | null };
+  answeredThisWeek: boolean;
   activeCycle: null | { id: string; opensAt: string; closesAt: string; teamName: string; coordinatorName: string; coordinatorAvatarUrl?: string };
   history: Array<{ cycleId: string; opensAt: string; status: "done" | "skipped" }>;
 };
@@ -22,6 +23,13 @@ export type CoordinatorTeam = {
     | { cycleId: string; opensAt: string; closesAt: string; threshold: number; status: "ready"; responseCount: number; dimensions: DimensionAverages; comments: string[] }
     | { cycleId: string; opensAt: string; closesAt: string; threshold: number; status: "insufficient_responses" };
   history: Array<{ cycleId: string; opensAt: string; status: "ready" | "insufficient_responses" }>;
+  complaints: CoordinatorComplaints;
+};
+
+export type CoordinatorComplaints = {
+  signed: Array<{ id: string; weekStart: string; authorName: string; topics: string[]; body: string }>;
+  anonymousWeeks: Array<{ weekStart: string; items: Array<{ id: string; topics: string[]; body: string }> }>;
+  withheldWeeks: string[];
 };
 
 export type CoordinatorDashboardData = {

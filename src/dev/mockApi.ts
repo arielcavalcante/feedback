@@ -1,7 +1,7 @@
 // Development-only fetch interceptor for `pnpm dev:mock`. It mirrors the response shapes and
 // authorization rules of worker/index.ts with fictional data, so no Worker, D1, or secrets are needed.
 import { devStore, DEV_PERSONAS } from "./store";
-import { handleOrg } from "./mockOrg";
+import { handleOrg, recordComplaint } from "./mockOrg";
 
 type Body = Record<string, unknown>;
 const LATENCY_MS = 220;
@@ -12,12 +12,12 @@ function respond(data: unknown, status = 200) {
 }
 const fail = (status: number, code: string, message: string) => respond({ error: { code, message } }, status);
 
-/** Current cycle window: Friday 09:00 to Sunday 23:59:59 in America/Fortaleza (UTC-3, no DST). */
+/** Current weekly cycle: Monday 00:00 to Sunday 23:59:59 in America/Fortaleza (UTC-3, no DST). */
 function cycleWindow(now = new Date()) {
   const local = new Date(now.getTime() - 3 * 3_600_000);
-  const daysUntilSunday = (7 - local.getUTCDay()) % 7;
-  const y = local.getUTCFullYear(), m = local.getUTCMonth(), d = local.getUTCDate() + daysUntilSunday;
-  return { opensAt: new Date(Date.UTC(y, m, d - 2, 12)), closesAt: new Date(Date.UTC(y, m, d + 1, 2, 59, 59)) };
+  const sinceMonday = (local.getUTCDay() + 6) % 7;
+  const monday = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() - sinceMonday);
+  return { opensAt: new Date(monday + 3 * 3_600_000), closesAt: new Date(monday + 7 * DAY + 2 * 3_600_000 + 59 * 60_000 + 59_000) };
 }
 
 function employeeDashboard() {
@@ -27,6 +27,7 @@ function employeeDashboard() {
   const coordinator = DEV_PERSONAS.coordinator.displayName;
   return {
     team: { name: "Praia Sertão — Produto", coordinatorName: coordinator },
+    answeredThisWeek: !cycleOpen || submitted,
     activeCycle: cycleOpen && !submitted ? {
       id: "dev-cycle-current",
       opensAt: opensAt.toISOString(),
@@ -36,7 +37,7 @@ function employeeDashboard() {
     } : null,
     history: statuses.map((status, index) => ({
       cycleId: `dev-cycle-${index + 1}`,
-      opensAt: new Date(opensAt.getTime() - (index + 1) * 14 * DAY).toISOString(),
+      opensAt: new Date(opensAt.getTime() - (index + 1) * 7 * DAY).toISOString(),
       status,
     })),
   };
@@ -79,6 +80,12 @@ function handle(method: string, path: string, body: Body): Response {
       if (!validPassword(body.password)) return fail(400, "invalid_password", "Use at least 15 characters.");
       devStore.patch({ role: "employee", signedIn: true });
       return respond({ user: DEV_PERSONAS.employee }, 201);
+    case "POST /api/employee/complaints": {
+      const denied = requireRole("employee");
+      if (denied) return denied;
+      const reply = recordComplaint(body);
+      return respond(reply.data, reply.status);
+    }
     case "GET /api/employee/dashboard":
       return requireRole("employee") ?? respond(employeeDashboard());
     case "POST /api/employee/feedback": {

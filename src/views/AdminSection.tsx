@@ -253,7 +253,7 @@ function TeamsPanel({ users, teams, onChanged }: { users: AdminUser[]; teams: Ad
         <div><p className="eyebrow">{t("Teams")}</p><h2 id="teams-title">{t("Teams and coordination")}</h2></div>
         <strong>{t("{count} active", { count: String(teams.filter((team) => team.isActive).length) })}</strong>
       </div>
-      <p className="admin-panel__intro">{t("Each team needs a coordinator. When a cycle opens, the people on the team at that moment are invited to answer.")}</p>
+      <p className="admin-panel__intro">{t("Each team needs a coordinator. Every week, people on the team rate their coordinator and can send complaints to them.")}</p>
       <ErrorMessage message={error} />
 
       {creating ? (

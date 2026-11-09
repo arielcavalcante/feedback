@@ -1,6 +1,7 @@
 // Development-only fictional organization for `pnpm dev:mock`: admin CRUD and coordinator views.
 // Mirrors worker/admin.ts and worker/coordinator.ts response shapes and guards.
-import type { AdminTeam, AdminUser, CoordinatorDashboardData, CoordinatorTeam, RoleKey } from "../types";
+import type { AdminTeam, AdminUser, CoordinatorComplaints, CoordinatorDashboardData, CoordinatorTeam, RoleKey } from "../types";
+import { COMPLAINT_MAX_LENGTH, COMPLAINT_TOPIC_KEYS } from "../../shared/complaints";
 import { devStore, DEV_PERSONAS } from "./store";
 
 type Body = Record<string, unknown>;
@@ -136,15 +137,14 @@ export function handleOrg(method: string, path: string, body: Body): Reply | nul
   return null;
 }
 
-/** Cycle `index` relative to the latest one that opened, on the production anchor (Fri 2026-09-18, every 14 days, UTC-3). */
-const ANCHOR_FRIDAY = Date.UTC(2026, 8, 18);
+/** Weekly cycle `index` relative to the current one (Monday 00:00 → Sunday 23:59:59, report Monday 09:00, UTC-3). */
 function cycleAt(index: number) {
-  const sequence = Math.floor((Date.now() - 3 * 3_600_000 - ANCHOR_FRIDAY) / (14 * DAY)) + index;
-  const friday = ANCHOR_FRIDAY + sequence * 14 * DAY;
+  const local = new Date(Date.now() - 3 * 3_600_000);
+  const monday = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() - ((local.getUTCDay() + 6) % 7) + index * 7);
   return {
-    opensAt: new Date(friday + 12 * 3_600_000).toISOString(),
-    closesAt: new Date(friday + 3 * DAY + 2 * 3_600_000 + 59 * 60_000 + 59_000).toISOString(),
-    reportAt: new Date(friday + 3 * DAY + 12 * 3_600_000).toISOString(),
+    opensAt: new Date(monday + 3 * 3_600_000).toISOString(),
+    closesAt: new Date(monday + 7 * DAY + 2 * 3_600_000 + 59 * 60_000 + 59_000).toISOString(),
+    reportAt: new Date(monday + 7 * DAY + 12 * 3_600_000).toISOString(),
   };
 }
 
@@ -165,7 +165,7 @@ function coordinatorDashboard(): CoordinatorDashboardData {
       "Time massa demais, mas a sexta tá pesada.",
     ],
   };
-  const base: CoordinatorTeam = { id: team.id, name: team.name, memberCount, isCurrent: true, openCycle: null, awaitingReport: null, latest: null, history: [] };
+  const base: CoordinatorTeam = { id: team.id, name: team.name, memberCount, isCurrent: true, openCycle: null, awaitingReport: null, latest: null, history: [], complaints: sampleComplaints(scenario !== "empty") };
   const nextCycle = { opensAt: cycleAt(1).opensAt, closesAt: cycleAt(1).closesAt };
   const open = (thresholdReached: boolean) => ({ cycleId: "dev-now", opensAt: current.opensAt, closesAt: new Date(Date.now() + 2 * DAY).toISOString(), participantCount: 4, threshold: 3, thresholdReached });
 
@@ -178,4 +178,42 @@ function coordinatorDashboard(): CoordinatorDashboardData {
     case "insufficient": return { nextCycle, teams: [{ ...base, latest: { cycleId: "dev-past-1", ...cycleAt(-1), threshold: 3, status: "insufficient_responses" }, history: [{ ...pastHistory[0], status: "insufficient_responses" }, ...pastHistory.slice(1)] }] };
     default: return { nextCycle, teams: [{ ...base, latest: ready, history: pastHistory }] };
   }
+}
+
+// Complaints sent during this dev session; signed ones show up for the coordinator right away.
+const sessionComplaints: CoordinatorComplaints["signed"] = [];
+
+export function recordComplaint(body: Body): Reply {
+  const topics = Array.isArray(body.topics) ? [...new Set(body.topics)] : [];
+  if (!topics.length || !topics.every((topic) => typeof topic === "string" && COMPLAINT_TOPIC_KEYS.includes(topic))) return fail(400, "invalid_complaint", "Choose at least one topic.");
+  const text = typeof body.body === "string" ? body.body.trim() : "";
+  if (!text) return fail(400, "invalid_complaint", "Write what’s bothering you.");
+  if (text.length > COMPLAINT_MAX_LENGTH) return fail(400, "invalid_complaint", "That text is too long. Split it into two complaints.");
+  if (body.signed) sessionComplaints.unshift({ id: crypto.randomUUID(), weekStart: mondayOf(0), authorName: devStore.persona().displayName, topics: (topics as string[]).sort(), body: text });
+  return ok({ ok: true, signed: Boolean(body.signed) }, 201);
+}
+
+function mondayOf(weeksBack: number) {
+  const local = new Date(Date.now() - 3 * 3_600_000);
+  const monday = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() - ((local.getUTCDay() + 6) % 7) - weeksBack * 7);
+  return new Date(monday).toISOString().slice(0, 10);
+}
+
+function sampleComplaints(withSamples: boolean): CoordinatorComplaints {
+  if (!withSamples) return { signed: [...sessionComplaints], anonymousWeeks: [], withheldWeeks: [] };
+  return {
+    signed: [
+      ...sessionComplaints,
+      { id: "s1", weekStart: mondayOf(0), authorName: "Caio Rocha", topics: ["equipment"], body: "Meu notebook tá desligando sozinho quando abro o Figma junto com o navegador. Já perdi trabalho duas vezes essa semana." },
+    ],
+    anonymousWeeks: [{
+      weekStart: mondayOf(1),
+      items: [
+        { id: "a1", topics: ["working_conditions", "infrastructure"], body: "O ar-condicionado da sala do fundo tá pingando de novo, e à tarde fica impossível de trabalhar lá." },
+        { id: "a2", topics: ["office_return"], body: "Voltar pro presencial todo dia tá pesando. Pelo menos um dia de casa já ajudaria muito." },
+        { id: "a3", topics: ["software", "processes"], body: "A gente aprova a mesma coisa em três ferramentas diferentes. Dava pra simplificar esse fluxo." },
+      ],
+    }],
+    withheldWeeks: [mondayOf(2)],
+  };
 }

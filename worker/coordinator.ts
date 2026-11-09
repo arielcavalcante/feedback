@@ -2,6 +2,7 @@ import type { Env } from "./env";
 import { requireRole } from "./access";
 import { json } from "./http";
 import { roundAverage, summarizeTeam, type CohortRow, type DimensionAverages } from "./domain/coordinator";
+import { coordinatorComplaints } from "./complaints";
 
 export async function handleCoordinatorDashboard(request: Request, env: Env): Promise<Response> {
   const user = await requireRole(request, env, "coordinator");
@@ -55,8 +56,10 @@ export async function handleCoordinatorDashboard(request: Request, env: Env): Pr
         comments: answers.results.flatMap((answer) => answer.textValue?.trim() ? [answer.textValue.trim()] : []),
       };
     }
+    const complaints = await coordinatorComplaints(env, user.id, teamId, new Date(now));
     return {
       id: teamId,
+      complaints,
       name: current?.name ?? rows[0]?.teamName ?? "",
       memberCount: current?.memberCount ?? null,
       isCurrent: Boolean(current),
@@ -71,5 +74,5 @@ export async function handleCoordinatorDashboard(request: Request, env: Env): Pr
   }));
 
   // Past teams without any reportable cycle add nothing for the coordinator.
-  return json({ nextCycle: nextCycle ?? null, teams: teams.filter((team) => team.isCurrent || team.history.length || team.openCycle || team.awaitingReport) });
+  return json({ nextCycle: nextCycle ?? null, teams: teams.filter((team) => team.isCurrent || team.history.length || team.openCycle || team.awaitingReport || team.complaints.signed.length || team.complaints.anonymousWeeks.length) });
 }

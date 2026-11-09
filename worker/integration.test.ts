@@ -105,7 +105,7 @@ describe("cycle snapshot and coordinator privacy", () => {
   const opened = (offsetDays: number) => new Date(Date.now() + offsetDays * 86_400_000).toISOString();
   function openCycle(id: string, sequence: number, opensAt: string, closesAt: string, reportAt: string) {
     db.prepare(`INSERT INTO feedback_cycles (id, schedule_id, sequence_number, opens_at, closes_at, report_at, employee_email_at, coordinator_email_at, status, anonymity_threshold_snapshot, created_at, opened_at)
-      VALUES (?, 'default-fortaleza-biweekly', ?, ?, ?, ?, ?, ?, 'open', 3, ?, ?)`).run(id, sequence, opensAt, closesAt, reportAt, opensAt, reportAt, opensAt, opensAt);
+      VALUES (?, 'default-fortaleza-weekly', ?, ?, ?, ?, ?, ?, 'open', 3, ?, ?)`).run(id, sequence, opensAt, closesAt, reportAt, opensAt, reportAt, opensAt, opensAt);
   }
 
   it("snapshots eligible employees when a cycle opens, excluding the coordinator", async () => {
@@ -113,14 +113,21 @@ describe("cycle snapshot and coordinator privacy", () => {
     db.prepare("UPDATE team_members SET starts_at = '2026-01-01T00:00:00.000Z'").run();
     db.prepare("UPDATE team_coordinators SET starts_at = '2026-01-01T00:00:00.000Z'").run();
     db.prepare("DELETE FROM team_members WHERE ends_at IS NOT NULL").run();
-    openCycle("cycle-past", 900, opened(-17), opened(-15), opened(-14));
-    await env.DB.batch([snapshotParticipants(env, "default-fortaleza-biweekly", new Date().toISOString()) as never]);
+    // Snapshot while the cycle is open, then move it into the past so it becomes a reported cohort.
+    openCycle("cycle-past", 900, opened(-1), opened(1), opened(2));
+    await env.DB.batch([snapshotParticipants(env, "default-fortaleza-weekly", new Date().toISOString()) as never]);
+    db.prepare("UPDATE feedback_cycles SET opens_at = ?, closes_at = ?, report_at = ?, status = 'reported' WHERE id = 'cycle-past'").run(opened(-17), opened(-11), opened(-10));
     const participants = db.prepare("SELECT employee_user_id AS id, coordinator_user_id AS coordinator FROM feedback_cycle_participants WHERE cycle_id = 'cycle-past'").all() as Array<{ id: string; coordinator: string }>;
     expect(participants.map((row) => row.id).sort()).toEqual([...employees].sort());
     expect(participants.every((row) => row.coordinator === coordinatorId)).toBe(true);
     // Idempotent on retry.
-    await env.DB.batch([snapshotParticipants(env, "default-fortaleza-biweekly", new Date().toISOString()) as never]);
+    await env.DB.batch([snapshotParticipants(env, "default-fortaleza-weekly", new Date().toISOString()) as never]);
     expect((db.prepare("SELECT COUNT(*) AS n FROM feedback_cycle_participants WHERE cycle_id = 'cycle-past'").get() as { n: number }).n).toBe(4);
+  });
+
+  it("uses the weekly schedule after the migration", () => {
+    const schedules = db.prepare("SELECT id, interval_days AS days, is_active AS active FROM feedback_schedules ORDER BY id").all();
+    expect(schedules).toEqual([{ id: "default-fortaleza-biweekly", days: 14, active: 0 }, { id: "default-fortaleza-weekly", days: 7, active: 1 }]);
   });
 
   it("shows nothing below the threshold and averages at the threshold", async () => {
@@ -159,5 +166,40 @@ describe("cycle snapshot and coordinator privacy", () => {
     const body = { cycleId: "cycle-now", coordinator: 4, team: 4, work: 4 };
     expect((await call(employee, "POST", "/api/employee/feedback", body)).status).toBe(201);
     expect((await call(employee, "POST", "/api/employee/feedback", body)).status).toBe(409);
+  });
+});
+
+describe("complaints", () => {
+  it("validates topics and requires a team with coordination", async () => {
+    const employee = await sessionFor(employees[0]);
+    expect((await call(employee, "POST", "/api/employee/complaints", { topics: ["leadership"], body: "x" })).status).toBe(400);
+    expect((await call(employee, "POST", "/api/employee/complaints", { topics: ["software"], body: "   " })).status).toBe(400);
+    const loner = await invite(admin, "Sem Time", ["employee"]);
+    expect((await call(await sessionFor(loner), "POST", "/api/employee/complaints", { topics: ["software"], body: "x" })).status).toBe(409);
+  });
+
+  it("shows signed complaints right away and holds anonymous ones for the week", async () => {
+    for (const [index, signed] of [[0, true], [1, false], [2, false]] as const) {
+      const response = await call(await sessionFor(employees[index]), "POST", "/api/employee/complaints", { topics: ["software", "equipment"], body: `Reclamação ${index}`, signed });
+      expect(response.status).toBe(201);
+    }
+    const coordinator = await sessionFor(coordinatorId);
+    type Dashboard = { teams: Array<{ complaints: { signed: Array<{ authorName: string; body: string }>; anonymousWeeks: unknown[]; withheldWeeks: string[] } }> };
+    let dashboard = await call<Dashboard>(coordinator, "GET", "/api/coordinator/dashboard");
+    expect(dashboard.body.teams[0].complaints.signed).toEqual([expect.objectContaining({ authorName: "Lia Um", body: "Reclamação 0" })]);
+    expect(dashboard.body.teams[0].complaints.anonymousWeeks).toEqual([]);
+    expect(JSON.stringify(dashboard.body)).not.toContain("Reclamação 1");
+
+    // After the week's release time: still withheld (2 anonymous people) until a third person complains.
+    db.prepare("UPDATE complaints SET release_at = ?").run(new Date(Date.now() - 1000).toISOString());
+    dashboard = await call(coordinator, "GET", "/api/coordinator/dashboard");
+    expect(dashboard.body.teams[0].complaints.withheldWeeks).toHaveLength(1);
+    expect(JSON.stringify(dashboard.body)).not.toContain("Reclamação 1");
+    await call(await sessionFor(employees[3]), "POST", "/api/employee/complaints", { topics: ["other"], body: "Reclamação 3" });
+    db.prepare("UPDATE complaints SET release_at = ?").run(new Date(Date.now() - 1000).toISOString());
+    dashboard = await call(coordinator, "GET", "/api/coordinator/dashboard");
+    const body = JSON.stringify(dashboard.body);
+    expect(body).toContain("Reclamação 1");
+    expect(body).not.toMatch(/Caio|Bia|Rui|authorUserId|created_?at/i);
   });
 });
