@@ -2,7 +2,8 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const forbiddenNames = new Set([".dev.vars", ".env", ".env.local"]);
-const forbiddenPatterns = [/(?:AUTH|PASSWORD)_PEPPER\s*=/, /RESEND_API_KEY\s*=/, /BEGIN (?:RSA |EC )?PRIVATE KEY/];
+// The last pattern is the `pnpm dev:mock` role bar and fake API (src/dev); it must never ship.
+const forbiddenPatterns = [/(?:AUTH|PASSWORD)_PEPPER\s*=/, /RESEND_API_KEY\s*=/, /BEGIN (?:RSA |EC )?PRIVATE KEY/, /ino-dev-bar|feedback-mock|feedback:dev-state/];
 const failures = [];
 
 function walk(directory) {

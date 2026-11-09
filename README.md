@@ -92,7 +92,15 @@ pnpm db:migrate:local
 pnpm dev
 ```
 
-Run `pnpm check` before committing. It type-checks, tests, validates Drizzle migrations, and builds the Worker plus React client. The current vertical slice exposes `/api/health`, invitation acceptance, login/logout, session lookup, password-reset endpoints, and an administrator invitation endpoint. The first production administrator is created with the operator command documented in `docs/SETUP.md`.
+### Dev mode with fictional data
+
+```sh
+pnpm dev:mock
+```
+
+Runs only the React app (no Worker, D1, or `.dev.vars`) with a fake API in `src/dev/` that mirrors the real response shapes and role checks. A bar at the top switches between **Admin**, **Coordenador**, **Funcionário**, and **Deslogado**, toggles the employee's open cycle, picks a coordinator scenario (results ready, open cycle below/at the minimum, awaiting Monday's report, below minimum, no cycles, no team), and can replay the first-visit introduction. Admin changes are kept in memory until the page reloads. Any email/password signs in as the selected profile. `pnpm build:mock` writes a static copy to `dist-mock/` for sharing a design preview. The production build never includes this code; `scripts/assert-safe-build.mjs` fails if it does.
+
+Run `pnpm check` before committing. It type-checks, tests, validates Drizzle migrations, and builds the Worker plus React client. The API exposes `/api/health`; invitation acceptance, login/logout, session lookup, and password reset; employee dashboard and submission; the coordinator dashboard (`/api/coordinator/dashboard`); and admin people/team management (`/api/admin/users`, `/api/admin/teams`, `/api/admin/invitations`). The scheduler snapshots eligible participants when a cycle opens. `/sobre` is a public page about the product's name. The first production administrator is created with the operator command documented in `docs/SETUP.md`.
 
 The production build temporarily excludes `.dev.vars` and scans `dist` for secret files/markers before succeeding. `pnpm preview` follows Cloudflare's local-preview behavior and may copy `.dev.vars` into ignored build output; Cloudflare documents that this preview copy is not deployed.
 

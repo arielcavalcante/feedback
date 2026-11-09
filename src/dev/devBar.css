@@ -1,0 +1,37 @@
+/* Development-only role bar for `pnpm dev:mock`. Not part of the product palette rules (ADR-017):
+   it is intentionally ink-on-paper inverted so it is never mistaken for product UI. */
+html.has-dev-bar { --dev-bar-height: 40px; }
+html.has-dev-bar body { padding-top: var(--dev-bar-height); }
+html.has-dev-bar .site-header { top: var(--dev-bar-height); }
+html.has-dev-bar .skip-link { top: calc(var(--dev-bar-height) + 8px); }
+html.has-dev-bar .guest-screen,
+html.has-dev-bar .guest-loading { min-height: calc(100svh - var(--dev-bar-height)); }
+html.has-dev-bar .intro-stage { min-height: calc(100svh - 80px - var(--dev-bar-height)); }
+
+.ino-dev-bar { position: fixed; inset: 0 0 auto; z-index: 1100; display: flex; align-items: center; gap: 14px; height: var(--dev-bar-height); padding: 0 16px; overflow-x: auto; background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 500; white-space: nowrap; scrollbar-width: none; }
+.ino-dev-bar::-webkit-scrollbar { display: none; }
+.ino-dev-bar__badge { flex: 0 0 auto; padding: 3px 7px; border-radius: 4px; background: var(--orange); color: var(--paper); font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.ino-dev-bar__group { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+.ino-dev-bar__label { margin-right: 6px; opacity: .64; }
+.ino-dev-bar__role { padding: 5px 12px; border-radius: 999px; background: transparent; color: var(--paper); cursor: pointer; transition: background-color 160ms ease, color 160ms ease; }
+.ino-dev-bar__role:hover, .ino-dev-bar__role:focus-visible { background: color-mix(in srgb, var(--paper) 14%, transparent); outline: none; }
+.ino-dev-bar__role[aria-pressed="true"] { background: var(--gold); color: var(--ink); }
+.ino-dev-bar__divider { flex: 0 0 auto; width: 1px; height: 18px; background: color-mix(in srgb, var(--paper) 24%, transparent); }
+.ino-dev-bar__toggle { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; cursor: pointer; }
+.ino-dev-bar__toggle input { width: 14px; height: 14px; min-height: 0; margin: 0; padding: 0; border-radius: 3px; accent-color: var(--gold); cursor: pointer; }
+.ino-dev-bar__toggle select { width: auto; min-height: 0; padding: 4px 8px; border-radius: 999px; background: color-mix(in srgb, var(--paper) 14%, transparent); color: var(--paper); font-size: 13px; }
+.ino-dev-bar__toggle select option { color: var(--ink); }
+.ino-dev-bar__who { margin-left: auto; padding-left: 12px; opacity: .64; }
+
+@media (max-width: 809px) {
+  /* The regular header's backdrop-filter makes it the menu's containing block, so only the height changes;
+     the intro header has no filter, so its menu is positioned against the viewport and needs the offset. */
+  html.has-dev-bar .desktop-nav { height: calc(100dvh - 60px - var(--dev-bar-height)); }
+  html.has-dev-bar .site-header--intro .desktop-nav { inset: calc(84px + var(--dev-bar-height)) 0 auto; height: calc(100dvh - 84px - var(--dev-bar-height)); }
+  html.has-dev-bar .intro-stage { min-height: calc(100svh - 84px - var(--dev-bar-height)); }
+  .ino-dev-bar { gap: 8px; padding: 0 10px; }
+  .ino-dev-bar__role { padding: 5px 9px; }
+  .ino-dev-bar__label, .ino-dev-bar__toggle select { width: auto; min-height: 0; padding: 4px 8px; border-radius: 999px; background: color-mix(in srgb, var(--paper) 14%, transparent); color: var(--paper); font-size: 13px; }
+.ino-dev-bar__toggle select option { color: var(--ink); }
+.ino-dev-bar__who { display: none; }
+}

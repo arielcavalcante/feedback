@@ -15,6 +15,7 @@ export function SiteFooter() {
             <p className="footer-title">{t("Feedback, with care.")}</p>
             <p className="footer-privacy"><span className="shell-icon" aria-hidden="true" />{t("Survey responses are anonymous to coordinators and teammates.")}</p>
             <a className="footer-contact-link" href="mailto:ino@mail.praiasertao.com.br">ino@mail.praiasertao.com.br</a>
+            <a className="footer-contact-link" href={`/sobre?lang=${locale}`}>{t("Why “ino”?")}</a>
           </div>
         </div>
       </div>

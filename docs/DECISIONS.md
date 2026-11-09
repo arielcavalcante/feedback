@@ -149,6 +149,34 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 - **Why:** Introduce the product in the approved conversational style, keep authentication visually focused, and avoid repeating onboarding during ordinary use.
 - **Consequences:** MVP completion is stored locally under a user-scoped key. Clearing browser storage or using another browser shows the introduction again; account-level synchronization can be added with profile preferences later.
 
+## ADR-022 — Client-only dev mode for role navigation
+
+- **Status:** accepted
+- **Decision:** `pnpm dev:mock` (Vite `--mode mock`) runs the React app without the Worker, replacing `/api/*` with an in-browser fake under `src/dev/` and adding a top bar to navigate as admin, coordinator, employee, or signed out. There is no server-side impersonation or role override.
+- **Why:** Review every role's screens quickly without seeding D1 or weakening the Worker's authorization boundary.
+- **Consequences:** Mock data is fictional and must mirror real API shapes and privacy rules (for example, history stays `done`/`skipped`). `main.tsx` loads the dev module only when `import.meta.env.MODE === "mock"`, and the safe-build check rejects production output containing it.
+
+## ADR-023 — Coordinator view: threshold bit while a cycle is open
+
+- **Status:** accepted (owner decision, 2026-11-09)
+- **Decision:** While a cycle is open, the coordinator sees only the closing date, the snapshot participant count, and whether the minimum of 3 answers has been reached (`thresholdReached`). The exact submitted count is never returned. Results (averages and comments) appear only for reported cycles that met the threshold; comments are ordered by random answer id, not by time.
+- **Why:** The owner asked to show progress during the cycle. A live count would let a coordinator of a ~6-person team correlate drops with people, so it is reduced to a single bit that flips once.
+- **Consequences:** The flip of the bit is still a weak timing signal for the third answer; this is accepted. `worker/domain/coordinator.ts` owns the projection and its tests cover thresholds `n-1`, `n`, `n+1`.
+
+## ADR-024 — One home for every role, and organization admin
+
+- **Status:** accepted
+- **Decision:** The home page renders one shared hero and then the sections of each role the person holds, in the order employee → coordinator → admin. Admins manage people (invite, edit name/profiles/team, deactivate/reactivate, resend invites) and teams (name, primary coordinator, deactivate) on the same page. MVP enforces one current team membership per person and one primary coordinator per team (docs/SETUP.md §7). Administrators cannot remove their own admin profile or deactivate themselves. The first-visit introduction is shown only to people with the employee profile.
+- **Why:** People in a six-person company often hold more than one role; stacking sections avoids a profile switcher in production.
+- **Consequences:** Deactivation revokes sessions, pending invitations and reset links, and ends memberships/coordination while keeping history. When a cycle opens, the scheduler snapshots eligible participants (active employees on an active team with a current coordinator, excluding the coordinator) exactly once.
+
+## ADR-025 — Editorial about page
+
+- **Status:** accepted
+- **Decision:** `/sobre` is a public, editorial page about the name (Ino/Leucothea in the Odyssey) and the product's features. It is an explicit exception to ADR-017: the Odyssey chapter uses a brand-blue band, and illustrations are original SVG drawings rather than third-party images.
+- **Why:** Few people will visit it, so it can be expressive while keeping body copy highly readable (≈60-character lines, 1.55 leading).
+- **Consequences:** Its copy lives in `src/views/AboutPage.tsx` per locale instead of the UI catalog. Motion respects `prefers-reduced-motion`.
+
 ## Open questions before implementation/launch
 
 ### MVP password work factor exception — accepted 2026-09-09

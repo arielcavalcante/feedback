@@ -9,6 +9,8 @@
   },
   "scripts": {
     "dev": "vite dev",
+    "dev:mock": "vite dev --mode mock",
+    "build:mock": "vite build --mode mock",
     "build": "node scripts/safe-build.mjs",
     "preview": "vite build && vite preview",
     "deploy": "pnpm build && wrangler deploy",
@@ -24,21 +26,21 @@
     "demo:employee": "node scripts/create-demo-employee.mjs"
   },
   "dependencies": {
-    "drizzle-orm": "latest",
-    "react": "latest",
-    "react-dom": "latest"
+    "drizzle-orm": "0.45.2",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "latest",
-    "@cloudflare/workers-types": "latest",
+    "@cloudflare/vite-plugin": "1.54.5",
+    "@cloudflare/workers-types": "5.20260908.1",
     "@types/node": "^22.20.1",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "@vitejs/plugin-react": "latest",
-    "drizzle-kit": "latest",
-    "typescript": "latest",
-    "vite": "latest",
-    "vitest": "latest",
-    "wrangler": "latest"
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@vitejs/plugin-react": "6.1.1",
+    "drizzle-kit": "0.31.10",
+    "typescript": "7.0.2",
+    "vite": "8.2.2",
+    "vitest": "5.0.0",
+    "wrangler": "4.129.1"
   }
 }

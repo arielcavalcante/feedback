@@ -12,3 +12,8 @@
 
 /reset-password*
   Cache-Control: no-store
+
+# Lets mail clients that support web fonts load Clash Grotesk for the account emails.
+/fonts/*
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=31536000, immutable

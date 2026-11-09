@@ -5,6 +5,12 @@ import { useLocale } from "../i18n";
 export function SiteHeader({ user, onSignOut, introMode = false }: { user: CurrentUser | null; onSignOut: () => void; introMode?: boolean }) {
   const { locale, t } = useLocale();
   const signedIn = Boolean(user);
+  // Section anchors follow the role sections rendered on the home page.
+  const sectionLinks = [
+    ...(user?.roles.includes("employee") ? [{ href: "#active-feedback", label: "Feedback" }, { href: "#history", label: "History" }] : []),
+    ...(user?.roles.includes("coordinator") ? [{ href: "#team-results", label: "My team" }] : []),
+    ...(user?.roles.includes("admin") ? [{ href: "#people", label: "People" }, { href: "#teams", label: "Teams" }] : []),
+  ];
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [pastTop, setPastTop] = useState(false);
@@ -88,8 +94,7 @@ export function SiteHeader({ user, onSignOut, introMode = false }: { user: Curre
         </a>
         <nav ref={navigationRef} id="primary-navigation" className={`desktop-nav${menuOpen ? " is-open" : ""}`} aria-label={t("Primary navigation")} onMouseOver={moveMarkerFromMouse} onMouseLeave={restoreMarker} onFocusCapture={moveMarkerFromFocus}>
           <a className="nav-primary-link is-active" href={`/?lang=${locale}`} aria-current="page" data-nav-marker="below" data-nav-current onClick={closeMenu}>{t("Home")}</a>
-          {signedIn && <a className="nav-primary-link" href="#active-feedback" data-nav-marker="below" onClick={closeMenu}>{t("Feedback")}</a>}
-          {signedIn && <a className="nav-primary-link" href="#history" data-nav-marker="below" onClick={closeMenu}>{t("History")}</a>}
+          {sectionLinks.map((link) => <a key={link.href} className="nav-primary-link" href={link.href} data-nav-marker="below" onClick={closeMenu}>{t(link.label)}</a>)}
           <a className="nav-primary-link" href="#privacy" data-nav-marker="below" onClick={closeMenu}>{t("Privacy")}</a>
           {user && (
             <div className={`profile-area${profileOpen ? " is-open" : ""}`} ref={profileRef}>

@@ -7,4 +7,28 @@ export async function runScheduler(env: Env, now: Date): Promise<void> {
   for (const schedule of schedules.results) { const elapsedDays = daysBetween(schedule.anchorOpenLocalDate, localDateInZone(now, schedule.timezone)); const currentSequence = Math.max(0, Math.floor(elapsedDays / schedule.intervalDays)); for (const sequence of new Set([currentSequence, currentSequence + 1])) await ensureCycle(env, schedule, sequence, holidays); await transitionDueCycles(env, schedule.id, now.toISOString()); }
 }
 async function ensureCycle(env: Env, schedule: ScheduleRow, sequence: number, holidays: ReadonlySet<string>): Promise<void> { const timing = cycleTiming(schedule, sequence, holidays); await env.DB.prepare(`INSERT INTO feedback_cycles (id, schedule_id, sequence_number, opens_at, closes_at, report_at, employee_email_at, coordinator_email_at, status, anonymity_threshold_snapshot, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?) ON CONFLICT(schedule_id, sequence_number) DO NOTHING`).bind(crypto.randomUUID(), schedule.id, sequence, timing.opensAt, timing.closesAt, timing.reportAt, timing.employeeEmailAt, timing.coordinatorEmailAt, schedule.anonymityThreshold, new Date().toISOString()).run(); }
-async function transitionDueCycles(env: Env, scheduleId: string, now: string): Promise<void> { await env.DB.batch([env.DB.prepare("UPDATE feedback_cycles SET status = 'open', opened_at = ? WHERE schedule_id = ? AND status = 'scheduled' AND opens_at <= ? AND closes_at > ?").bind(now, scheduleId, now, now), env.DB.prepare("UPDATE feedback_cycles SET status = 'closed', closed_at = ? WHERE schedule_id = ? AND status = 'open' AND closes_at <= ?").bind(now, scheduleId, now), env.DB.prepare("UPDATE feedback_cycles SET status = 'reported', reported_at = ? WHERE schedule_id = ? AND status = 'closed' AND report_at <= ?").bind(now, scheduleId, now)]); }
+async function transitionDueCycles(env: Env, scheduleId: string, now: string): Promise<void> { await env.DB.batch([env.DB.prepare("UPDATE feedback_cycles SET status = 'open', opened_at = ? WHERE schedule_id = ? AND status = 'scheduled' AND opens_at <= ? AND closes_at > ?").bind(now, scheduleId, now, now), snapshotParticipants(env, scheduleId, now), env.DB.prepare("UPDATE feedback_cycles SET status = 'closed', closed_at = ? WHERE schedule_id = ? AND status = 'open' AND closes_at <= ?").bind(now, scheduleId, now), env.DB.prepare("UPDATE feedback_cycles SET status = 'reported', reported_at = ? WHERE schedule_id = ? AND status = 'closed' AND report_at <= ?").bind(now, scheduleId, now)]); }
+
+/**
+ * Eligibility snapshot for cycles that are open and still have no participants (idempotent and retry-safe):
+ * active employees with a current team membership that started before the cycle opened, assigned to the
+ * team's current primary coordinator. Later team changes never alter an existing snapshot.
+ */
+export function snapshotParticipants(env: Env, scheduleId: string, now: string): D1PreparedStatement {
+  return env.DB.prepare(`INSERT INTO feedback_cycle_participants (id, cycle_id, employee_user_id, team_id, coordinator_user_id, eligibility_status, created_at)
+    SELECT lower(hex(randomblob(16))), c.id, tm.user_id, tm.team_id, tc.user_id, 'eligible', ?
+    FROM feedback_cycles c
+    JOIN team_members tm ON tm.starts_at <= c.opens_at AND (tm.ends_at IS NULL OR tm.ends_at > c.opens_at)
+    JOIN teams t ON t.id = tm.team_id AND t.is_active = 1
+    JOIN users u ON u.id = tm.user_id AND u.is_active = 1
+    JOIN team_coordinators tc ON tc.id = (
+      SELECT candidate.id FROM team_coordinators candidate
+      WHERE candidate.team_id = tm.team_id AND candidate.starts_at <= c.opens_at AND (candidate.ends_at IS NULL OR candidate.ends_at > c.opens_at)
+      ORDER BY candidate.is_primary DESC, candidate.starts_at LIMIT 1)
+    WHERE c.schedule_id = ? AND c.status = 'open'
+      AND NOT EXISTS (SELECT 1 FROM feedback_cycle_participants existing WHERE existing.cycle_id = c.id)
+      AND tc.user_id != tm.user_id
+      AND EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id
+        WHERE ur.user_id = tm.user_id AND ur.revoked_at IS NULL AND r.key = 'employee')
+    ON CONFLICT(cycle_id, employee_user_id, team_id) DO NOTHING`).bind(now, scheduleId);
+}

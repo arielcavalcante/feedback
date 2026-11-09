@@ -3,6 +3,9 @@ import { digestToken, randomToken } from "./auth/crypto";
 import { hashPassword, validatePassword, verifyPassword } from "./auth/password";
 import { clearAuthLimit, consumeAuthLimit } from "./auth/rate-limit";
 import { clearSessionCookie, createSession, currentUser, readCookie, SESSION_COOKIE, sessionCookie, type SessionUser } from "./auth/session";
+import { audit, normalizeEmail, parseRoles, requireRole } from "./access";
+import { handleAdminCreateTeam, handleAdminTeams, handleAdminUpdateTeam, handleAdminUpdateUser, handleAdminUsers, membershipStatements, roleStatements, validTeamId } from "./admin";
+import { handleCoordinatorDashboard } from "./coordinator";
 import { sendAccountEmail } from "./email";
 import { assertSameOrigin, HttpError, json, readJson } from "./http";
 import { runScheduler } from "./scheduler/run";
@@ -32,6 +35,13 @@ export default {
       if (request.method === "POST" && url.pathname === "/api/auth/password-reset/accept") return await handleResetAccept(request, env);
       if (request.method === "POST" && url.pathname === "/api/admin/invitations") return await handleCreateInvitation(request, env);
       if (request.method === "GET" && url.pathname === "/api/employee/dashboard") return await handleEmployeeDashboard(request, env);
+      if (request.method === "GET" && url.pathname === "/api/coordinator/dashboard") return await handleCoordinatorDashboard(request, env);
+      if (request.method === "GET" && url.pathname === "/api/admin/users") return await handleAdminUsers(request, env);
+      if (request.method === "GET" && url.pathname === "/api/admin/teams") return await handleAdminTeams(request, env);
+      if (request.method === "POST" && url.pathname === "/api/admin/teams") return await handleAdminCreateTeam(request, env);
+      const adminResource = url.pathname.match(/^\/api\/admin\/(users|teams)\/([A-Za-z0-9-]{1,64})$/);
+      if (request.method === "PATCH" && adminResource?.[1] === "users") return await handleAdminUpdateUser(request, env, adminResource[2]);
+      if (request.method === "PATCH" && adminResource?.[1] === "teams") return await handleAdminUpdateTeam(request, env, adminResource[2]);
       if (request.method === "POST" && url.pathname === "/api/employee/feedback") return await handleEmployeeFeedback(request, env);
 
       return json({ error: { code: "not_found", message: translate("Route not found.", locale) } }, { status: 404 });
@@ -49,7 +59,7 @@ export default {
 
 async function handleMe(request: Request, env: Env): Promise<Response> {
   const user = await currentUser(request, env);
-  if (!user) return json({ error: { code: "unauthenticated", message: "Please sign in." } }, { status: 401 });
+  if (!user) throw new HttpError(401, "unauthenticated", "Please sign in.");
   return json({ user });
 }
 
@@ -118,12 +128,16 @@ async function handleInviteAccept(request: Request, env: Env): Promise<Response>
 async function handleCreateInvitation(request: Request, env: Env): Promise<Response> {
   const locale = requestLocale(request);
   const actor = await requireRole(request, env, "admin");
-  const body = await readJson<{ email?: unknown; displayName?: unknown; roles?: unknown }>(request);
+  const body = await readJson<{ email?: unknown; displayName?: unknown; roles?: unknown; teamId?: unknown }>(request);
   if (typeof body.email !== "string" || typeof body.displayName !== "string" || !Array.isArray(body.roles)) throw new HttpError(400, "invalid_user", "Provide an email, name, and roles.");
   const email = normalizeEmail(body.email);
-  const roleKeys = [...new Set(body.roles)].filter((role): role is "admin" | "coordinator" | "employee" => typeof role === "string" && ["admin", "coordinator", "employee"].includes(role));
-  if (!email || body.displayName.trim().length < 2 || roleKeys.length === 0) throw new HttpError(400, "invalid_user", "Provide a valid email, name, and role.");
-  const existing = await env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(email).first<{ id: string }>();
+  const roleKeys = parseRoles(body.roles);
+  const displayName = body.displayName.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || displayName.length < 2 || displayName.length > 120 || !roleKeys) throw new HttpError(400, "invalid_user", "Provide a valid email, name, and role.");
+  const teamId = await validTeamId(env, body.teamId);
+  const existing = await env.DB.prepare(`SELECT u.id, EXISTS (SELECT 1 FROM auth_credentials c WHERE c.user_id = u.id) AS hasPassword
+    FROM users u WHERE u.email = ?`).bind(email).first<{ id: string; hasPassword: number }>();
+  if (existing?.hasPassword) throw new HttpError(409, "user_exists", "This person already has an account.");
   const userId = existing?.id ?? crypto.randomUUID();
   const invitationId = crypto.randomUUID();
   const token = randomToken();
@@ -132,21 +146,26 @@ async function handleCreateInvitation(request: Request, env: Env): Promise<Respo
   const expiresAt = new Date(now.getTime() + Number.parseInt(env.INVITATION_TTL_HOURS, 10) * 3_600_000).toISOString();
   const statements = [
     env.DB.prepare(`INSERT INTO users (id, email, display_name, is_active, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)
-      ON CONFLICT(email) DO UPDATE SET display_name = excluded.display_name, is_active = 1, updated_at = excluded.updated_at`).bind(userId, email, body.displayName.trim(), now.toISOString(), now.toISOString()),
+      ON CONFLICT(email) DO UPDATE SET display_name = excluded.display_name, is_active = 1, deactivated_at = NULL, updated_at = excluded.updated_at`).bind(userId, email, displayName, now.toISOString(), now.toISOString()),
     env.DB.prepare("UPDATE account_invitations SET revoked_at = ? WHERE user_id = ? AND accepted_at IS NULL AND revoked_at IS NULL").bind(now.toISOString(), userId),
     env.DB.prepare(`INSERT INTO account_invitations (id, user_id, email_snapshot, token_digest, expires_at, created_by_user_id, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)`).bind(invitationId, userId, email, digest, expiresAt, actor.id, now.toISOString()),
-    ...roleKeys.map((role) => env.DB.prepare(`INSERT INTO user_roles (user_id, role_id, granted_at, granted_by_user_id)
-      SELECT ?, id, ?, ? FROM roles WHERE key = ? ON CONFLICT(user_id, role_id) DO UPDATE SET revoked_at = NULL, granted_at = excluded.granted_at, granted_by_user_id = excluded.granted_by_user_id`).bind(userId, now.toISOString(), actor.id, role)),
+    ...roleStatements(env, userId, roleKeys, actor.id, now.toISOString()),
+    ...(teamId !== undefined ? membershipStatements(env, userId, teamId, actor.id, now.toISOString()) : []),
   ];
   await env.DB.batch(statements);
   const actionUrl = `${env.APP_ORIGIN}/accept-invite#token=${encodeURIComponent(token)}`;
   await sendAccountEmail(env, {
     to: email,
     locale,
-    subject: translate("You’re invited to Team Feedback", locale),
-    heading: translate("Welcome, {name}", locale, { name: body.displayName.trim() }),
-    body: translate("Create your account before {date}.", locale, { date: formatDate(expiresAt, locale) }),
+    subject: translate("Your invitation to ino", locale),
+    preheader: translate("Create your password and come on in.", locale),
+    eyebrow: translate("Your invitation", locale),
+    heading: translate("Hello, {name}", locale, { name: displayName.split(/\s+/)[0] }),
+    body: [
+      translate("You’re invited to ino. Here the team shares feedback every other Friday — and coordination only ever sees the group’s results.", locale),
+      translate("Create your password by {date}. Use at least 15 characters — a sentence works well.", locale, { date: formatDate(expiresAt, locale) }),
+    ],
     actionLabel: translate("Create account", locale),
     actionUrl,
   });
@@ -172,9 +191,14 @@ async function handleResetRequest(request: Request, env: Env): Promise<Response>
       await sendAccountEmail(env, {
         to: user.email,
         locale,
-        subject: translate("Reset your Team Feedback password", locale),
+        subject: translate("Reset your ino password", locale),
+        preheader: translate("Choose a new password using the button inside.", locale),
+        eyebrow: translate("Account recovery", locale),
         heading: translate("Reset your password", locale),
-        body: translate("This link expires at {date}.", locale, { date: formatDate(expiresAt, locale) }),
+        body: [
+          translate("We got a request to reset your ino password.", locale),
+          translate("This link expires at {date}.", locale, { date: formatDate(expiresAt, locale) }),
+        ],
         actionLabel: translate("Reset password", locale),
         actionUrl,
       }).catch((error) => {
@@ -235,7 +259,17 @@ async function handleEmployeeDashboard(request: Request, env: Env): Promise<Resp
     .filter((row) => row.closesAt <= now || row.cycleStatus === "closed" || row.cycleStatus === "reported")
     .map((row) => ({ cycleId: row.cycleId, opensAt: row.opensAt, status: row.submissionId ? "done" as const : "skipped" as const }));
 
+  // Current team and coordination, independent of any cycle (used by the introduction's org chart).
+  const team = await env.DB.prepare(`SELECT t.name AS name, coordinator.display_name AS coordinatorName
+    FROM team_members tm
+    JOIN teams t ON t.id = tm.team_id AND t.is_active = 1
+    LEFT JOIN team_coordinators tc ON tc.id = (SELECT c.id FROM team_coordinators c WHERE c.team_id = tm.team_id AND c.ends_at IS NULL ORDER BY c.is_primary DESC, c.starts_at LIMIT 1)
+    LEFT JOIN users coordinator ON coordinator.id = tc.user_id AND coordinator.is_active = 1
+    WHERE tm.user_id = ? AND tm.ends_at IS NULL
+    ORDER BY tm.starts_at DESC LIMIT 1`).bind(user.id).first<{ name: string; coordinatorName: string | null }>();
+
   return json({
+    team: team ? { name: team.name, coordinatorName: team.coordinatorName ?? null } : null,
     activeCycle: activeRow ? {
       id: activeRow.cycleId,
       opensAt: activeRow.opensAt,
@@ -285,7 +319,13 @@ async function handleEmployeeFeedback(request: Request, env: Env): Promise<Respo
   const comment = typeof body.comment === "string" ? body.comment.trim() : "";
   if (comment) statements.push(env.DB.prepare("INSERT INTO feedback_answers (id, submission_id, dimension, question_key, text_value, created_at) VALUES (?, ?, 'work', 'optional_comment', ?, ?)")
     .bind(crypto.randomUUID(), submissionId, comment, now));
-  await env.DB.batch(statements);
+  try {
+    await env.DB.batch(statements);
+  } catch (error) {
+    // Two concurrent submissions: the unique participant index rejects the second one.
+    if (error instanceof Error && /UNIQUE/i.test(error.message)) throw new HttpError(409, "feedback_submitted", "You already completed this feedback cycle.");
+    throw error;
+  }
   await audit(env, user.id, "feedback.submitted", "feedback_submission", submissionId, "success");
   return json({ ok: true }, { status: 201 });
 }
@@ -298,13 +338,6 @@ async function validInvitation(env: Env, token: string) {
     WHERE i.token_digest = ? AND i.accepted_at IS NULL AND i.revoked_at IS NULL AND i.expires_at > ? AND u.is_active = 1`).bind(digest, now).first<{ userId: string; email: string; expiresAt: string; displayName: string }>();
 }
 
-async function requireRole(request: Request, env: Env, role: SessionUser["roles"][number]): Promise<SessionUser> {
-  const user = await currentUser(request, env);
-  if (!user) throw new HttpError(401, "unauthenticated", "Please sign in.");
-  if (!user.roles.includes(role)) throw new HttpError(403, "forbidden", "You do not have access to this action.");
-  return user;
-}
-
 async function userWithRoles(env: Env, userId: string): Promise<SessionUser> {
   const rows = await env.DB.prepare(`SELECT u.id, u.email, u.display_name AS displayName, r.key AS roleKey FROM users u
     LEFT JOIN user_roles ur ON ur.user_id = u.id AND ur.revoked_at IS NULL LEFT JOIN roles r ON r.id = ur.role_id WHERE u.id = ?`).bind(userId).all<{ id: string; email: string; displayName: string; roleKey: SessionUser["roles"][number] | null }>();
@@ -312,10 +345,4 @@ async function userWithRoles(env: Env, userId: string): Promise<SessionUser> {
   return { id: first.id, email: first.email, displayName: first.displayName, roles: rows.results.flatMap((row) => row.roleKey ? [row.roleKey] : []) };
 }
 
-async function audit(env: Env, actorUserId: string | null, action: string, resourceType: string, resourceId: string | null, outcome: string): Promise<void> {
-  await env.DB.prepare("INSERT INTO audit_logs (id, occurred_at, actor_user_id, action, resource_type, resource_id, outcome) VALUES (?, ?, ?, ?, ?, ?, ?)")
-    .bind(crypto.randomUUID(), new Date().toISOString(), actorUserId, action, resourceType, resourceId, outcome).run();
-}
-
-function normalizeEmail(email: string): string { return email.trim().toLowerCase(); }
 function passwordIterations(env: Env): number { return Number.parseInt(env.PASSWORD_PBKDF2_ITERATIONS, 10); }

@@ -1,0 +1,111 @@
+/* Editorial about page (/sobre). An intentional exception to ADR-017's paper-only surfaces:
+   the Odyssey chapter sits on a brand-blue "sea" band. Body copy keeps ~60ch lines and 1.55 leading. */
+.about { --about-pad: clamp(24px, 6vw, 96px); min-height: 100vh; overflow: clip; background: var(--paper); color: var(--ink); }
+.about h1, .about h2, .about h3, .about p, .about ol, .about ul, .about blockquote { margin: 0; }
+
+.about-bar { position: absolute; top: 0; right: 0; left: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; padding: 28px var(--about-pad); }
+.about-bar__logo { display: block; width: 46px; }
+.about-bar__back { display: inline-flex; align-items: center; gap: 12px; color: var(--brand-blue); font-size: 15px; font-weight: 500; text-decoration: none; }
+.about-bar__back .case-link__icon { transform: scaleX(-1); }
+.about-bar__back:hover, .about-bar__back:focus-visible { opacity: .6; }
+
+.about-label { margin-bottom: 28px; color: var(--brand-blue); font-size: 13px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
+.about-kicker { color: var(--brand-blue); font-size: 13px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
+.about h2 { color: var(--brand-blue); font-size: clamp(40px, 5.2vw, 84px); font-weight: 500; line-height: .95; letter-spacing: -.045em; text-wrap: balance; }
+.about-copy { display: grid; gap: 22px; max-width: 58ch; font-size: clamp(18px, 1.5vw, 21px); line-height: 1.55; }
+.about-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: clamp(28px, 6vw, 120px); }
+
+/* Hero: the word as the image. */
+.about-hero { position: relative; display: grid; min-height: 100svh; padding: clamp(120px, 16vh, 180px) var(--about-pad) clamp(64px, 10vh, 120px); align-content: end; isolation: isolate; }
+.about-hero__word { position: relative; z-index: 2; margin-top: 18px !important; color: var(--brand-blue); font-size: clamp(170px, 34vw, 560px); font-weight: 500; line-height: .74; letter-spacing: -.07em; }
+.about-hero__word::first-letter { color: var(--orange); }
+.about-hero__pronounce { position: relative; z-index: 2; margin-top: clamp(18px, 2vw, 32px) !important; color: var(--brand-blue); font-size: clamp(18px, 1.6vw, 24px); font-weight: 500; }
+.about-hero__pronounce span { margin-right: 10px; font-weight: 300; }
+.about-hero__lead { position: relative; z-index: 2; max-width: 30ch; margin-top: clamp(28px, 4vw, 56px) !important; font-size: clamp(22px, 2.4vw, 34px); line-height: 1.25; letter-spacing: -.01em; }
+.about-hero__veil { position: absolute; top: clamp(70px, 10vh, 120px); right: calc(var(--about-pad) * -1); z-index: 1; width: min(62vw, 820px); height: auto; }
+.veil-strand { transform-box: view-box; transform-origin: 10% 50%; }
+@media (prefers-reduced-motion: no-preference) {
+  .veil-strand { animation: veil-drift 8s ease-in-out infinite alternate; }
+  .veil-strand--2 { animation-duration: 9.5s; animation-delay: -2s; }
+  .veil-strand--3 { animation-duration: 11s; animation-delay: -4s; }
+  .veil-strand--4 { animation-duration: 12.5s; animation-delay: -6s; }
+  .veil-strand--thread { animation-duration: 7s; animation-delay: -1s; }
+}
+@keyframes veil-drift { from { transform: translate(0, 0) rotate(0deg); } to { transform: translate(-10px, 14px) rotate(-2.5deg); } }
+
+/* Origin. */
+.about-block { padding: clamp(96px, 14vw, 200px) var(--about-pad); }
+.about-transformations { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(16px, 2vw, 28px); margin-top: clamp(64px, 8vw, 120px); }
+.about-transform { position: relative; display: grid; min-height: clamp(320px, 32vw, 460px); padding: clamp(24px, 3vw, 44px); overflow: hidden; align-content: end; border-radius: 28px; background: color-mix(in srgb, var(--brand-blue) 6%, var(--paper)); }
+.about-transform:nth-child(2) { margin-top: clamp(0px, 8vw, 120px); }
+.about-transform__from { color: var(--brand-blue); font-size: 18px; font-weight: 500; text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.about-transform__arrow { display: block; width: 2px; height: 34px; margin: 12px 0 14px 4px; background: var(--orange); }
+.about-transform__to { color: var(--brand-blue); font-size: clamp(44px, 5vw, 80px); font-weight: 500; line-height: .95; letter-spacing: -.045em; }
+.about-transform__greek { position: absolute; top: clamp(16px, 2vw, 28px); right: clamp(16px, 2vw, 32px); color: transparent; font-size: clamp(56px, 8vw, 132px); font-weight: 500; line-height: 1; letter-spacing: -.03em; -webkit-text-stroke: 1.5px color-mix(in srgb, var(--brand-blue) 38%, transparent); }
+.about-transform__note { max-width: 32ch; margin-top: 16px !important; font-size: 18px; line-height: 1.45; }
+
+/* The sea. */
+.about-sea { position: relative; background: var(--brand-blue); color: var(--paper); }
+.about-sea__waves { position: absolute; top: -79px; left: 0; display: block; width: 100%; height: 80px; overflow: hidden; }
+@media (prefers-reduced-motion: no-preference) {
+  .about-sea .wave { animation: wave-roll 14s linear infinite; }
+  .about-sea .wave--back { animation-duration: 22s; animation-direction: reverse; }
+}
+@keyframes wave-roll { from { transform: translateX(0); } to { transform: translateX(-300px); } }
+.about-sea__inner { padding: clamp(96px, 12vw, 180px) var(--about-pad) clamp(96px, 14vw, 200px); }
+.about-sea .about-label { color: var(--gold); }
+.about-sea h2 { color: var(--paper); }
+.about-steps { display: grid; gap: clamp(28px, 3vw, 44px); margin-top: clamp(72px, 9vw, 140px) !important; padding: 0; list-style: none; counter-reset: none; }
+.about-steps li { display: grid; grid-template-columns: clamp(64px, 8vw, 120px) minmax(0, 34ch); align-items: start; gap: 18px; }
+/* The list drifts across the page like the crossing itself. */
+.about-steps li:nth-child(2) { margin-left: 8%; }
+.about-steps li:nth-child(3) { margin-left: 16%; }
+.about-steps li:nth-child(4) { margin-left: 24%; }
+.about-steps li:nth-child(5) { margin-left: 32%; }
+.about-steps__number { color: var(--gold); font-size: clamp(64px, 8vw, 120px); font-weight: 500; line-height: .8; letter-spacing: -.05em; }
+.about-steps p { padding-top: .35em; font-size: clamp(19px, 1.7vw, 24px); line-height: 1.4; }
+.about-quote { position: relative; width: min(100%, 980px); margin: clamp(96px, 12vw, 180px) 0 0 auto !important; padding-top: 40px; }
+.about-quote::before { position: absolute; top: -.18em; left: -.06em; color: var(--gold); font-size: clamp(120px, 14vw, 220px); line-height: 1; content: "“"; }
+.about-quote p { position: relative; max-width: 20ch; font-size: clamp(32px, 4.2vw, 68px); font-weight: 500; line-height: 1.05; letter-spacing: -.035em; text-wrap: balance; }
+
+/* Meaning. */
+.about-meaning__title { max-width: 16ch; }
+.about-meaning__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(28px, 4vw, 64px); margin-top: clamp(64px, 8vw, 120px); }
+.about-meaning__item--2 { margin-top: clamp(0px, 6vw, 96px); }
+.about-meaning__item--3 { margin-top: clamp(0px, 12vw, 192px); }
+.about-meaning__item h3 { padding-bottom: 18px; color: var(--brand-blue); font-size: clamp(34px, 3.4vw, 56px); font-weight: 500; line-height: 1; letter-spacing: -.04em; box-shadow: 0 2px 0 var(--gold); }
+.about-meaning__item p { margin-top: 22px !important; font-size: clamp(18px, 1.4vw, 20px); line-height: 1.55; }
+
+/* Features. */
+.about-features { padding-top: 0; }
+.about-features h2 { max-width: 14ch; }
+.about-features__list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(40px, 5vw, 72px) clamp(28px, 4vw, 64px); margin-top: clamp(56px, 7vw, 100px) !important; padding: 0; list-style: none; }
+.about-features__list .shell-icon { width: 22px; height: 18px; color: var(--gold); }
+.about-features__list h3 { margin-top: 18px; color: var(--brand-blue); font-size: clamp(22px, 1.8vw, 28px); font-weight: 500; line-height: 1.1; letter-spacing: -.02em; }
+.about-features__list p { max-width: 36ch; margin-top: 12px !important; font-size: 18px; line-height: 1.55; }
+
+/* Closing. */
+.about-closing { display: grid; min-height: 80svh; padding: clamp(80px, 10vw, 160px) var(--about-pad); place-content: center; justify-items: center; gap: 22px; text-align: center; }
+.about-closing__big { color: var(--brand-blue); font-size: clamp(56px, 10vw, 180px); font-weight: 500; line-height: .9; letter-spacing: -.06em; text-wrap: balance; }
+.about-closing__small { font-size: clamp(20px, 2vw, 28px); }
+.about .about-closing__back { width: min(320px, 100%); margin-top: 32px; }
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .about-transform, .about-steps li, .about-meaning__item, .about-features__list li, .about-quote, .about-closing__big {
+      animation: about-rise linear both; animation-timeline: view(); animation-range: entry 0% entry 60%;
+    }
+    @keyframes about-rise { from { opacity: 0; transform: translateY(48px); } to { opacity: 1; transform: none; } }
+  }
+}
+
+@media (max-width: 809px) {
+  .about-bar { padding: 22px 24px; }
+  .about-hero { min-height: auto; padding-top: 120px; }
+  .about-hero__veil { top: 64px; right: -24vw; width: 72vw; }
+  .about-columns, .about-transformations, .about-meaning__grid, .about-features__list { grid-template-columns: 1fr; }
+  .about-transform:nth-child(2), .about-meaning__item--2, .about-meaning__item--3 { margin-top: 0; }
+  .about-steps li { margin-left: 0 !important; grid-template-columns: 64px minmax(0, 1fr); }
+  .about-quote { max-width: none; }
+  .about-sea__waves { top: -39px; height: 40px; }
+}

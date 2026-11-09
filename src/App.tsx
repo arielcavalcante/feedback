@@ -1,14 +1,19 @@
-import { type FormEvent, type ReactNode, useEffect, useId, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { api, type CurrentUser } from "./api";
 import { useLocale } from "./i18n";
 import { SiteHeader } from "./components/SiteHeader";
 import { SiteFooter } from "./components/SiteFooter";
+import { ErrorMessage, errorText, Field, initials, Primary } from "./components/ui";
+import { CoordinatorSection } from "./views/CoordinatorSection";
+import { AdminSection } from "./views/AdminSection";
+import { AboutPage } from "./views/AboutPage";
+import type { EmployeeDashboardData } from "./types";
 
 function currentRoute() {
   const url = new URL(window.location.href);
   const token = new URLSearchParams(url.hash.slice(1)).get("token") ?? url.searchParams.get("token") ?? undefined;
-  const view = url.pathname === "/accept-invite" ? "invite" : url.pathname === "/reset-password" ? "reset" : "login";
-  if (view !== "login") {
+  const view = url.pathname === "/accept-invite" ? "invite" : url.pathname === "/reset-password" ? "reset" : url.pathname === "/sobre" || url.pathname === "/about" ? "about" : "login";
+  if (view === "invite" || view === "reset") {
     url.hash = "";
     url.searchParams.delete("token");
     window.history.replaceState({}, "", url.pathname + url.search);
@@ -24,6 +29,11 @@ function hasCompletedIntro(userId: string) {
   try { return window.localStorage.getItem(introKey(userId)) === "1"; } catch { return false; }
 }
 
+/** The introduction explains the employee survey, so only people who answer it see it. */
+function needsIntro(user: CurrentUser) {
+  return user.roles.includes("employee") && !hasCompletedIntro(user.id);
+}
+
 export function App() {
   const { t, locale } = useLocale();
   const [user, setUser] = useState<CurrentUser | null>(null);
@@ -35,7 +45,7 @@ export function App() {
     api<{ user: CurrentUser }>("/api/auth/me")
       .then(({ user: nextUser }) => {
         setUser(nextUser);
-        setIntroComplete(hasCompletedIntro(nextUser.id));
+        setIntroComplete(!needsIntro(nextUser));
       })
       .catch(() => setUser(null))
       .finally(() => setChecking(false));
@@ -52,7 +62,7 @@ export function App() {
 
   function authenticate(nextUser: CurrentUser) {
     setUser(nextUser);
-    setIntroComplete(hasCompletedIntro(nextUser.id));
+    setIntroComplete(!needsIntro(nextUser));
   }
 
   function finishIntro() {
@@ -60,6 +70,9 @@ export function App() {
     try { window.localStorage.setItem(introKey(user.id), "1"); } catch { /* Continue for this session if storage is unavailable. */ }
     setIntroComplete(true);
   }
+
+  // The about page is public and independent from the session.
+  if (route.view === "about") return <div className="page-shell"><a className="skip-link" href="#main-content">{t("Skip to content")}</a><AboutPage /></div>;
 
   return (
     <div className="page-shell">
@@ -100,12 +113,6 @@ function Shell({ eyebrow, title, children }: { eyebrow: string; title: string; c
   );
 }
 
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return "?";
-  return `${parts[0][0]}${parts.length > 1 ? parts.at(-1)?.[0] ?? "" : ""}`.toLocaleUpperCase("pt-BR");
-}
-
 function IntroAvatar({ name, imageUrl, size }: { name: string; imageUrl?: string; size: "coordinator" | "employee" }) {
   return (
     <span className={`intro-avatar intro-avatar--${size}`}>
@@ -129,7 +136,8 @@ function ProductIntro({ user, onComplete }: { user: CurrentUser; onComplete: () 
     api<EmployeeDashboardData>("/api/employee/dashboard")
       .then((dashboard) => {
         const activeCycle = dashboard.activeCycle;
-        if (activeCycle?.coordinatorName) setCoordinatorDisplayName(activeCycle.coordinatorName);
+        const name = dashboard.team?.coordinatorName ?? activeCycle?.coordinatorName;
+        if (name) setCoordinatorDisplayName(name);
         if (activeCycle?.coordinatorAvatarUrl) setCoordinatorAvatarUrl(activeCycle.coordinatorAvatarUrl);
       })
       .catch(() => undefined);
@@ -162,7 +170,9 @@ function ProductIntro({ user, onComplete }: { user: CurrentUser; onComplete: () 
           <div className="intro-stage__content intro-org">
             <div>
               <h1>{t("Organization chart")}</h1>
-              <p>{t("I asked around and saw you report to {name}, right?", { name: coordinatorName })}</p>
+              <p>{coordinatorDisplayName
+                ? t("I asked around and saw you report to {name}, right?", { name: coordinatorName })
+                : t("I asked around, but I couldn’t find your coordinator yet. Once you’re added to a team, they’ll show up here.")}</p>
             </div>
             <div className="intro-org__diagram" role="img" aria-label={t("You and your coordinator")}>
               <IntroAvatar name={coordinatorAvatarName} imageUrl={coordinatorAvatarUrl} size="coordinator" />
@@ -227,23 +237,6 @@ function ProductIntro({ user, onComplete }: { user: CurrentUser; onComplete: () 
       </section>
     </main>
   );
-}
-
-function Primary({ busy, disabled, children }: { busy?: boolean; disabled?: boolean; children: ReactNode }) {
-  return (
-    <button className="case-link primary" disabled={busy || disabled} aria-busy={busy}>
-      <span>{children}</span><span className="case-link__icon" aria-hidden="true" />
-    </button>
-  );
-}
-
-function ErrorMessage({ message }: { message: string }) {
-  const { t } = useLocale();
-  return message ? <p className="error" role="alert">{t(message)}</p> : null;
-}
-
-function errorText(caught: unknown, fallback: string) {
-  return caught instanceof Error ? caught.message : fallback;
 }
 
 function Login({ onLogin }: { onLogin: (user: CurrentUser) => void }) {
@@ -419,28 +412,38 @@ function AcceptInvite({ token, onAccepted }: { token?: string; onAccepted: (user
   );
 }
 
+const ROLE_ORDER = ["employee", "coordinator", "admin"] as const;
+const HERO_COPY = {
+  coordinator: { status: "Your team", lead: "Here’s how your team is doing — always as a group, never one person at a time." },
+  admin: { status: "Administration", lead: "Invite people, adjust access, and keep teams and coordination up to date." },
+} as const;
+
+/** One home for every profile: a person with several roles sees each role's sections in order. */
 function Home({ user, error }: { user: CurrentUser; error: string }) {
-  if (user.roles.includes("employee")) return <EmployeeHome user={user} logoutError={error} />;
   const { t } = useLocale();
+  const roles = ROLE_ORDER.filter((role) => user.roles.includes(role));
+  const primary = roles[0];
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const firstName = user.displayName.trim().split(/\s+/)[0];
+  const status = primary === "employee" ? (feedbackOpen ? "Feedback open today" : "Your feedback space") : primary ? HERO_COPY[primary].status : "Workspace ready";
+  const lead = primary === "employee" ? "A few honest minutes today can make the next conversation better." : primary ? HERO_COPY[primary].lead : "Your account doesn’t have an access profile yet. Ask an administrator.";
+
   return (
-    <main id="main-content" className="home page-width">
-      <section className="welcome">
-        <p className="availability"><span className="availability__dot" aria-hidden="true" />{t("Workspace ready")}</p>
-        <h1>{t("Hello, {name}", { name: user.displayName })}<span className="welcome-shell shell-icon" aria-hidden="true" /></h1>
-        <p className="welcome-copy">{t("Your account is active. Product dashboards will arrive in the next implementation phases.")}</p>
-        <div className="roles" aria-label={t("Your roles")}>{user.roles.map((role) => <span key={role}>{t(role)}</span>)}</div>
-        <ErrorMessage message={error} />
+    <main id="main-content" className="dashboard page-width">
+      <section className="dashboard-hero">
+        <p className="availability"><span className="availability__dot" aria-hidden="true" />{t(status)}</p>
+        <h1>{t("Hello, {name}", { name: firstName })}</h1>
+        <p>{t(lead)}</p>
       </section>
+      {roles.includes("employee") && <EmployeeSection user={user} onActiveCycle={setFeedbackOpen} />}
+      {roles.includes("coordinator") && <CoordinatorSection />}
+      {roles.includes("admin") && <AdminSection currentUserId={user.id} />}
+      <ErrorMessage message={error} />
     </main>
   );
 }
 
-type EmployeeDashboardData = {
-  activeCycle: null | { id: string; opensAt: string; closesAt: string; teamName: string; coordinatorName: string; coordinatorAvatarUrl?: string };
-  history: Array<{ cycleId: string; opensAt: string; status: "done" | "skipped" }>;
-};
-
-function EmployeeHome({ user, logoutError }: { user: CurrentUser; logoutError: string }) {
+function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: (open: boolean) => void }) {
   const { t, locale } = useLocale();
   const [dashboard, setDashboard] = useState<EmployeeDashboardData | null>(null);
   const [loadError, setLoadError] = useState("");
@@ -452,7 +455,9 @@ function EmployeeHome({ user, logoutError }: { user: CurrentUser; logoutError: s
 
   async function loadDashboard() {
     try {
-      setDashboard(await api<EmployeeDashboardData>("/api/employee/dashboard"));
+      const next = await api<EmployeeDashboardData>("/api/employee/dashboard");
+      setDashboard(next);
+      onActiveCycle(Boolean(next.activeCycle));
       setLoadError("");
     } catch (caught) {
       setLoadError(errorText(caught, "Unable to load your feedback space."));
@@ -484,74 +489,65 @@ function EmployeeHome({ user, logoutError }: { user: CurrentUser; logoutError: s
   const date = (value: string, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(locale === "en" ? "en-US" : "pt-BR", {
     timeZone: "America/Fortaleza", ...options,
   }).format(new Date(value));
-  const firstName = user.displayName.trim().split(/\s+/)[0];
 
   return (
-    <main id="main-content" className="employee-dashboard page-width">
-      <section className="employee-hero">
-        <p className="availability"><span className="availability__dot" aria-hidden="true" />{t(dashboard?.activeCycle ? "Feedback open today" : "Your feedback space")}</p>
-        <h1>{t("Hello, {name}", { name: firstName })}</h1>
-        <p>{t("A few honest minutes today can make the next conversation better.")}</p>
+    <div className="dashboard-layout">
+      <section className="active-feedback" id="active-feedback" aria-labelledby="active-feedback-title">
+        {submitted && <p className="success" role="status">{t("Feedback sent. Thank you for taking the time.")}</p>}
+        {!dashboard ? (
+          <p role="status">{t("Loading your feedback cycles…")}</p>
+        ) : dashboard.activeCycle ? (
+          <>
+            <div className="section-heading">
+              <div><p className="eyebrow">{t("Today")}</p><h2 id="active-feedback-title">{t("Your feedback is waiting")}</h2></div>
+              <span className="status-pill status-pill--pending">{t("Pending")}</span>
+            </div>
+            <p className="active-feedback__intro">{t("Think about the last two weeks. Your answers are confidential and shown only in anonymous group results.")}</p>
+            <dl className="cycle-meta">
+              <div><dt>{t("Team")}</dt><dd>{dashboard.activeCycle.teamName}</dd></div>
+              <div><dt>{t("Coordinator")}</dt><dd>{dashboard.activeCycle.coordinatorName}</dd></div>
+              <div><dt>{t("Closes")}</dt><dd>{date(dashboard.activeCycle.closesAt, { weekday: "long", hour: "2-digit", minute: "2-digit" })}</dd></div>
+            </dl>
+            {!surveyOpen ? (
+              <button className="case-link primary dashboard-action" onClick={() => setSurveyOpen(true)}>
+                <span>{t("Answer now")}</span><span className="case-link__icon" aria-hidden="true" />
+              </button>
+            ) : (
+              <form className="survey-form" onSubmit={submit}>
+                <p className="survey-form__hint">{t("1 means very dissatisfied; 5 means very satisfied.")}</p>
+                <RatingField label={t("How do you feel about your coordinator?")} value={ratings.coordinator} onChange={(value) => setRatings({ ...ratings, coordinator: value })} />
+                <RatingField label={t("How do you feel about your team?")} value={ratings.team} onChange={(value) => setRatings({ ...ratings, team: value })} />
+                <RatingField label={t("How do you feel about your work?")} value={ratings.work} onChange={(value) => setRatings({ ...ratings, work: value })} />
+                <label className="comment-field"><span>{t("Anything else you’d like to share? (optional)")}</span><textarea value={comment} maxLength={2000} onChange={(event) => setComment(event.target.value)} /></label>
+                <ErrorMessage message={loadError} />
+                <Primary busy={busy} disabled={Object.values(ratings).some((rating) => rating === 0)}>{t(busy ? "Sending feedback…" : "Send feedback")}</Primary>
+                <button type="button" className="text-button align-left" onClick={() => setSurveyOpen(false)}>{t("Answer later")}</button>
+              </form>
+            )}
+          </>
+        ) : (
+          <div className="all-done"><span className="all-done__mark" aria-hidden="true">✓</span><div><p className="eyebrow">{t("All done")}</p><h2 id="active-feedback-title">{t("Nothing pending today")}</h2><p>{t("We’ll let you know when the next feedback cycle opens.")}</p></div></div>
+        )}
+        {!surveyOpen && <ErrorMessage message={loadError} />}
       </section>
 
-      <div className="employee-layout">
-        <section className="active-feedback" id="active-feedback" aria-labelledby="active-feedback-title">
-          {submitted && <p className="success" role="status">{t("Feedback sent. Thank you for taking the time.")}</p>}
-          {!dashboard ? (
-            <p role="status">{t("Loading your feedback cycles…")}</p>
-          ) : dashboard.activeCycle ? (
-            <>
-              <div className="section-heading">
-                <div><p className="eyebrow">{t("Today")}</p><h2 id="active-feedback-title">{t("Your feedback is waiting")}</h2></div>
-                <span className="status-pill status-pill--pending">{t("Pending")}</span>
-              </div>
-              <p className="active-feedback__intro">{t("Think about the last two weeks. Your answers are confidential and shown only in anonymous group results.")}</p>
-              <dl className="cycle-meta">
-                <div><dt>{t("Team")}</dt><dd>{dashboard.activeCycle.teamName}</dd></div>
-                <div><dt>{t("Coordinator")}</dt><dd>{dashboard.activeCycle.coordinatorName}</dd></div>
-                <div><dt>{t("Closes")}</dt><dd>{date(dashboard.activeCycle.closesAt, { weekday: "long", hour: "2-digit", minute: "2-digit" })}</dd></div>
-              </dl>
-              {!surveyOpen ? (
-                <button className="case-link primary dashboard-action" onClick={() => setSurveyOpen(true)}>
-                  <span>{t("Answer now")}</span><span className="case-link__icon" aria-hidden="true" />
-                </button>
-              ) : (
-                <form className="survey-form" onSubmit={submit}>
-                  <p className="survey-form__hint">{t("1 means very dissatisfied; 5 means very satisfied.")}</p>
-                  <RatingField label={t("How do you feel about your coordinator?")} value={ratings.coordinator} onChange={(value) => setRatings({ ...ratings, coordinator: value })} />
-                  <RatingField label={t("How do you feel about your team?")} value={ratings.team} onChange={(value) => setRatings({ ...ratings, team: value })} />
-                  <RatingField label={t("How do you feel about your work?")} value={ratings.work} onChange={(value) => setRatings({ ...ratings, work: value })} />
-                  <label className="comment-field"><span>{t("Anything else you’d like to share? (optional)")}</span><textarea value={comment} maxLength={2000} onChange={(event) => setComment(event.target.value)} /></label>
-                  <ErrorMessage message={loadError} />
-                  <Primary busy={busy} disabled={Object.values(ratings).some((rating) => rating === 0)}>{t(busy ? "Sending feedback…" : "Send feedback")}</Primary>
-                  <button type="button" className="text-button align-left" onClick={() => setSurveyOpen(false)}>{t("Answer later")}</button>
-                </form>
-              )}
-            </>
-          ) : (
-            <div className="all-done"><span className="all-done__mark" aria-hidden="true">✓</span><div><p className="eyebrow">{t("All done")}</p><h2 id="active-feedback-title">{t("Nothing pending today")}</h2><p>{t("We’ll let you know when the next feedback cycle opens.")}</p></div></div>
-          )}
-          {!surveyOpen && <ErrorMessage message={loadError || logoutError} />}
-        </section>
-
-        <section className="cycle-history" id="history" aria-labelledby="history-title">
-          <div className="section-heading">
-            <div><p className="eyebrow">{t("History")}</p><h2 id="history-title">{t("Your participation")}</h2></div>
-            <strong>{dashboard ? t("{count} completed", { count: String(dashboard.history.filter((cycle) => cycle.status === "done").length) }) : "—"}</strong>
-          </div>
-          <p>{t("We only show whether you participated. Your answers and scores never appear here.")}</p>
-          <div className="cycle-grid" aria-label={t("Past feedback cycles")}>
-            {dashboard?.history.map((cycle) => (
-              <article className={`cycle-square cycle-square--${cycle.status}`} key={cycle.cycleId} aria-label={`${date(cycle.opensAt, { dateStyle: "long" })}: ${t(cycle.status)}`}>
-                <span className="cycle-square__mark" aria-hidden="true">{cycle.status === "done" ? "✓" : "–"}</span>
-                <time dateTime={cycle.opensAt}>{date(cycle.opensAt, { day: "2-digit", month: "short" })}</time>
-                <span>{t(cycle.status)}</span>
-              </article>
-            ))}
-          </div>
-        </section>
-      </div>
-    </main>
+      <section className="cycle-history" id="history" aria-labelledby="history-title">
+        <div className="section-heading">
+          <div><p className="eyebrow">{t("History")}</p><h2 id="history-title">{t("Your participation")}</h2></div>
+          <strong>{dashboard ? t("{count} completed", { count: String(dashboard.history.filter((cycle) => cycle.status === "done").length) }) : "—"}</strong>
+        </div>
+        <p>{t("We only show whether you participated. Your answers and scores never appear here.")}</p>
+        <div className="cycle-grid" aria-label={t("Past feedback cycles")}>
+          {dashboard?.history.map((cycle) => (
+            <article className={`cycle-square cycle-square--${cycle.status}`} key={cycle.cycleId} aria-label={`${date(cycle.opensAt, { dateStyle: "long" })}: ${t(cycle.status)}`}>
+              <span className="cycle-square__mark" aria-hidden="true">{cycle.status === "done" ? "✓" : "–"}</span>
+              <time dateTime={cycle.opensAt}>{date(cycle.opensAt, { day: "2-digit", month: "short" })}</time>
+              <span>{t(cycle.status)}</span>
+            </article>
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -559,38 +555,3 @@ function RatingField({ label, value, onChange }: { label: string; value: number;
   return <fieldset className="rating-field"><legend>{label}</legend><div>{[1, 2, 3, 4, 5].map((rating) => <label key={rating} className={value === rating ? "is-selected" : ""}><input type="radio" name={label} value={rating} checked={value === rating} onChange={() => onChange(rating)} required /><span>{rating}</span></label>)}</div></fieldset>;
 }
 
-function Field(props: {
-  label: string;
-  type: string;
-  value: string;
-  onChange?: (value: string) => void;
-  readOnly?: boolean;
-  autoComplete?: string;
-  hint?: string;
-  minLength?: number;
-}) {
-  const { label, hint, onChange, ...inputProps } = props;
-  const { t } = useLocale();
-  const id = useId();
-  return (
-    <label className="field" htmlFor={id}>
-      <span>{label}</span>
-      <input
-        id={id}
-        {...inputProps}
-        required
-        aria-describedby={hint ? `${id}-hint` : undefined}
-        onChange={(event) => {
-          event.target.setCustomValidity("");
-          onChange?.(event.target.value);
-        }}
-        onInvalid={(event) => {
-          const input = event.currentTarget;
-          input.setCustomValidity("");
-          input.setCustomValidity(t(input.validity.valueMissing ? "Please fill out this field." : input.validity.typeMismatch ? "Please enter a valid email address." : "Use at least 15 characters."));
-        }}
-      />
-      {hint && <small id={`${id}-hint`}>{hint}</small>}
-    </label>
-  );
-}
