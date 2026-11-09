@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useId, useState } from "react";
 import { api } from "../api";
 import { useLocale } from "../i18n";
 import { ErrorMessage, errorText, Field, initials, Primary } from "../components/ui";
+import { useToast } from "../components/Toast";
 import type { AdminTeam, AdminUser, RoleKey } from "../types";
 
 const ROLES: RoleKey[] = ["admin", "coordinator", "employee"];
@@ -12,7 +13,6 @@ const STATUS_LABEL: Record<AdminUser["status"], string> = {
   inactive: "Inactive",
 };
 
-type Notice = { text: string; link?: string };
 type InvitationResponse = { invitation: { email: string; actionUrl?: string } };
 
 export function AdminSection({ currentUserId }: { currentUserId: string }) {
@@ -53,13 +53,13 @@ function PeoplePanel({ users, teams, currentUserId, onChanged }: { users: AdminU
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [notice, setNotice] = useState<Notice | null>(null);
+  const toast = useToast();
   const [error, setError] = useState("");
   const teamName = (teamId: string | null) => teams.find((team) => team.id === teamId)?.name;
   const activeCount = users.filter((user) => user.status !== "inactive").length;
 
   async function run(userId: string | null, action: () => Promise<void>) {
-    setBusyId(userId); setError(""); setNotice(null);
+    setBusyId(userId); setError("");
     try { await action(); await onChanged(); }
     catch (caught) { setError(errorText(caught, "Something went wrong. Please try again.")); }
     finally { setBusyId(null); }
@@ -67,7 +67,7 @@ function PeoplePanel({ users, teams, currentUserId, onChanged }: { users: AdminU
 
   async function sendInvitation(values: PersonValues) {
     const result = await api<InvitationResponse>("/api/admin/invitations", { method: "POST", body: JSON.stringify(values) });
-    setNotice({ text: t("Invitation sent to {email}.", { email: result.invitation.email }), link: result.invitation.actionUrl });
+    toast(t("Invitation sent to {email}.", { email: result.invitation.email }), result.invitation.actionUrl ? { href: result.invitation.actionUrl, label: t("Open invitation link (development only)") } : undefined);
   }
 
   return (
@@ -78,12 +78,6 @@ function PeoplePanel({ users, teams, currentUserId, onChanged }: { users: AdminU
       </div>
       <p className="admin-panel__intro">{t("Invite people, choose what each one can access, and set their team. Survey answers never appear here.")}</p>
 
-      {notice && (
-        <p className="success" role="status">
-          {notice.text}
-          {notice.link && <> <a href={notice.link}>{t("Open invitation link (development only)")}</a></>}
-        </p>
-      )}
       <ErrorMessage message={error} />
 
       {creating ? (
@@ -114,7 +108,7 @@ function PeoplePanel({ users, teams, currentUserId, onChanged }: { users: AdminU
                   onSubmit={(values) => run(user.id, async () => {
                     await api(`/api/admin/users/${user.id}`, { method: "PATCH", body: JSON.stringify({ displayName: values.displayName, roles: values.roles, teamId: values.teamId }) });
                     setEditingId(null);
-                    setNotice({ text: t("Changes saved for {name}.", { name: values.displayName }) });
+                    toast(t("Changes saved for {name}.", { name: values.displayName }));
                   })}
                 />
               </li>
@@ -142,6 +136,7 @@ function PeoplePanel({ users, teams, currentUserId, onChanged }: { users: AdminU
                     <button type="button" className="text-button text-button--danger" disabled={busyId === user.id} onClick={() => run(user.id, async () => {
                       await api(`/api/admin/users/${user.id}`, { method: "PATCH", body: JSON.stringify({ isActive: false }) });
                       setConfirmingId(null);
+                      toast(t("{name} was deactivated.", { name: user.displayName }));
                     })}>{t("Confirm deactivation")}</button>
                     <button type="button" className="text-button" onClick={() => setConfirmingId(null)}>{t("Cancel")}</button>
                   </>
@@ -155,6 +150,7 @@ function PeoplePanel({ users, teams, currentUserId, onChanged }: { users: AdminU
                     {user.status === "inactive" && (
                       <button type="button" className="text-button" disabled={busyId === user.id} onClick={() => run(user.id, async () => {
                         await api(`/api/admin/users/${user.id}`, { method: "PATCH", body: JSON.stringify({ isActive: true }) });
+                        toast(t("{name} was reactivated.", { name: user.displayName }));
                       })}>{t("Reactivate")}</button>
                     )}
                   </>
@@ -232,6 +228,7 @@ function PersonForm({ initial, teams, isSelf = false, submitLabel, onSubmit, onC
 
 function TeamsPanel({ users, teams, onChanged }: { users: AdminUser[]; teams: AdminTeam[]; onChanged: () => Promise<void> }) {
   const { t } = useLocale();
+  const toast = useToast();
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -260,6 +257,7 @@ function TeamsPanel({ users, teams, onChanged }: { users: AdminUser[]; teams: Ad
         <TeamForm coordinators={coordinators} submitLabel="Create team" onCancel={() => setCreating(false)} onSubmit={(values) => run(null, async () => {
           await api("/api/admin/teams", { method: "POST", body: JSON.stringify(values) });
           setCreating(false);
+          toast(t("Team {name} created.", { name: values.name }));
         })} />
       ) : (
         <button className="case-link primary admin-panel__add" type="button" onClick={() => { setCreating(true); setEditingId(null); }}>
@@ -276,6 +274,7 @@ function TeamsPanel({ users, teams, onChanged }: { users: AdminUser[]; teams: Ad
                 <TeamForm initial={team} coordinators={coordinators} submitLabel="Save changes" onCancel={() => setEditingId(null)} onSubmit={(values) => run(team.id, async () => {
                   await api(`/api/admin/teams/${team.id}`, { method: "PATCH", body: JSON.stringify(values) });
                   setEditingId(null);
+                  toast(t("Changes saved for {name}.", { name: values.name }));
                 })} />
               </li>
             );

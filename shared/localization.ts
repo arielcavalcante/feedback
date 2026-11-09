@@ -383,6 +383,10 @@ export const portuguese = {
   "Choose the date of the conversation.": "Escolhe a data da conversa.",
   "Choose someone from your team.": "Escolhe alguém do teu time.",
   "Conversation not found.": "Conversa não encontrada.",
+  "{name} was deactivated.": "{name} foi desativada.",
+  "{name} was reactivated.": "{name} foi reativada.",
+  "Team {name} created.": "Equipe {name} criada.",
+  "Conversation saved. {name} can see the notes now.": "Conversa salva. {name} já pode ver as anotações.",
 } satisfies Record<string, string>;
 
 export function normalizeLocale(value: unknown): Locale {

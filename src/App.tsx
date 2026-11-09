@@ -5,6 +5,7 @@ import { SiteHeader } from "./components/SiteHeader";
 import { SiteFooter } from "./components/SiteFooter";
 import { ErrorMessage, errorText, Field, formatInZone, initials, Primary, SignToggle } from "./components/ui";
 import { SignedEvaluationCard } from "./components/SignedEvaluationCard";
+import { ToastProvider, useToast } from "./components/Toast";
 import { CoordinatorSection } from "./views/CoordinatorSection";
 import { AdminSection } from "./views/AdminSection";
 import { AboutPage } from "./views/AboutPage";
@@ -77,6 +78,7 @@ export function App() {
   if (route.view === "about") return <div className="page-shell"><a className="skip-link" href="#main-content">{t("Skip to content")}</a><AboutPage /></div>;
 
   return (
+    <ToastProvider>
     <div className="page-shell">
       <a className="skip-link" href="#main-content">{t("Skip to content")}</a>
       {user && <SiteHeader user={user} onSignOut={logout} introMode={!introComplete} />}
@@ -95,6 +97,7 @@ export function App() {
       )}
       {user && introComplete && <SiteFooter />}
     </div>
+    </ToastProvider>
   );
 }
 
@@ -460,7 +463,7 @@ function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: 
   const [ratings, setRatings] = useState({ coordinator: 0, team: 0, work: 0 });
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState("");
+  const toast = useToast();
   const [signed, setSigned] = useState(false);
   const [confirmSign, setConfirmSign] = useState(false);
   const surveyOpen = mode === "survey";
@@ -488,7 +491,7 @@ function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: 
         method: "POST",
         body: JSON.stringify({ cycleId: dashboard.activeCycle.id, ...ratings, comment, signed }),
       });
-      setNotice(t(signed ? "Signed check-in sent. {name} can see it so you two can talk." : "Check-in sent. Thanks for taking the time.", { name: coordinatorName ?? t("your coordinator") }));
+      toast(t(signed ? "Signed check-in sent. {name} can see it so you two can talk." : "Check-in sent. Thanks for taking the time.", { name: coordinatorName ?? t("your coordinator") }));
       setMode("idle");
       await loadDashboard();
     } catch (caught) {
@@ -505,7 +508,7 @@ function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: 
     try {
       await api("/api/employee/feedback/sign", { method: "POST", body: JSON.stringify({ cycleId: dashboard.thisWeek.cycleId }) });
       setConfirmSign(false);
-      setNotice(t("Done. {name} can now see this week’s check-in with your name.", { name: coordinatorName ?? t("your coordinator") }));
+      toast(t("Done. {name} can now see this week’s check-in with your name.", { name: coordinatorName ?? t("your coordinator") }));
       await loadDashboard();
     } catch (caught) {
       setLoadError(errorText(caught, "Something went wrong. Please try again."));
@@ -523,7 +526,6 @@ function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: 
     <>
     <div className="dashboard-layout">
       <section className="active-feedback" id="active-feedback" aria-labelledby="active-feedback-title">
-        {notice && mode === "idle" && <p className="success" role="status">{notice}</p>}
         {!dashboard ? (
           <p role="status">{t("Loading your feedback cycles…")}</p>
         ) : mode === "complaint" && coordinatorName ? (
@@ -531,7 +533,7 @@ function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: 
             coordinatorName={coordinatorName}
             onCancel={() => setMode("idle")}
             onSent={(signed) => {
-              setNotice(signed
+              toast(signed
                 ? t("Complaint sent to {name}.", { name: coordinatorName })
                 : t("Complaint saved. It reaches coordination on Monday if at least 3 people complained this week."));
               setMode("idle");
@@ -594,12 +596,12 @@ function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: 
             ) : (
               <div className="action-row">
                 {dashboard.activeCycle && (
-                  <button className="case-link primary" type="button" onClick={() => { setNotice(""); setSigned(false); setMode("survey"); }}>
+                  <button className="case-link primary" type="button" onClick={() => { setSigned(false); setMode("survey"); }}>
                     <span>{t("Answer now")}</span><span className="case-link__icon" aria-hidden="true" />
                   </button>
                 )}
                 {coordinatorName && (
-                  <button className={`case-link ${dashboard.activeCycle ? "secondary" : "primary"}`} type="button" onClick={() => { setNotice(""); setMode("complaint"); }}>
+                  <button className={`case-link ${dashboard.activeCycle ? "secondary" : "primary"}`} type="button" onClick={() => setMode("complaint")}>
                     <span>{t("Complain")}</span><span className="case-link__icon" aria-hidden="true" />
                   </button>
                 )}

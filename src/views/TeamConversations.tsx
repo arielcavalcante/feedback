@@ -3,6 +3,7 @@ import { api } from "../api";
 import { useLocale } from "../i18n";
 import { ErrorMessage, errorText, formatInZone, initials, Primary } from "../components/ui";
 import { SignedEvaluationCard } from "../components/SignedEvaluationCard";
+import { useToast } from "../components/Toast";
 import type { Conversation, TeamPerson } from "../types";
 
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Fortaleza", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -93,6 +94,7 @@ function PersonPanel({ person, onSaved }: { person: TeamPerson; onSaved: () => P
 
 function ConversationForm({ person, editing, onDone, onCancel }: { person: TeamPerson; editing: Conversation | null; onDone: () => Promise<void>; onCancel?: () => void }) {
   const { t } = useLocale();
+  const toast = useToast();
   const id = useId();
   const [heldOn, setHeldOn] = useState(editing?.heldOn ?? today());
   const [notes, setNotes] = useState(editing?.notes ?? "");
@@ -106,6 +108,7 @@ function ConversationForm({ person, editing, onDone, onCancel }: { person: TeamP
       if (editing) await api(`/api/coordinator/conversations/${editing.id}`, { method: "PATCH", body: JSON.stringify({ heldOn, notes }) });
       else await api("/api/coordinator/conversations", { method: "POST", body: JSON.stringify({ employeeUserId: person.id, heldOn, notes }) });
       if (!editing) setNotes("");
+      toast(t("Conversation saved. {name} can see the notes now.", { name: person.name.split(/\s+/)[0] }));
       await onDone();
     } catch (caught) {
       setError(errorText(caught, "Something went wrong. Please try again."));
