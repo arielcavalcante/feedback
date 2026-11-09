@@ -203,3 +203,52 @@ describe("complaints", () => {
     expect(body).not.toMatch(/Caio|Bia|Rui|authorUserId|created_?at/i);
   });
 });
+
+describe("signed check-ins and conversations", () => {
+  type People = { people: Array<{ id: string; signedEvaluations: Array<{ coordinator: number; team: number; work: number; comment: string | null }>; conversations: Array<{ id: string; notes: string }> }> };
+
+  it("shows a signed check-in only to the coordinator and keeps it out of anonymous counts", async () => {
+    const employee = await sessionFor(employees[2]);
+    const sent = await call(employee, "POST", "/api/employee/feedback", { cycleId: "cycle-now", coordinator: 2, team: 4, work: 5, comment: "Quero conversar sobre prazos", signed: true });
+    expect(sent.status).toBe(201);
+    const coordinator = await sessionFor(coordinatorId);
+    const people = await call<People>(coordinator, "GET", "/api/coordinator/people");
+    const person = people.body.people.find((item) => item.id === employees[2]);
+    expect(person?.signedEvaluations[0]).toMatchObject({ coordinator: 2, team: 4, work: 5, comment: "Quero conversar sobre prazos" });
+    // employees[3] answered anonymously in the earlier test; the signed one doesn't make it look like 2.
+    const dashboard = await call<{ teams: Array<{ openCycle: { thresholdReached: boolean } }> }>(coordinator, "GET", "/api/coordinator/dashboard");
+    expect(dashboard.body.teams[0].openCycle.thresholdReached).toBe(false);
+    expect(people.body.people.find((item) => item.id === employees[3])?.signedEvaluations).toEqual([]);
+  });
+
+  it("lets an employee sign later only while the week is open, and only once", async () => {
+    const employee = await sessionFor(employees[0]);
+    expect((await call(employee, "POST", "/api/employee/feedback", { cycleId: "cycle-now", coordinator: 3, team: 3, work: 3 })).status).toBe(201);
+    expect((await call(employee, "POST", "/api/employee/feedback/sign", { cycleId: "cycle-now" })).status).toBe(200);
+    expect((await call(employee, "POST", "/api/employee/feedback/sign", { cycleId: "cycle-now" })).status).toBe(409);
+    const other = await sessionFor(employees[1]);
+    expect((await call(other, "POST", "/api/employee/feedback", { cycleId: "cycle-now", coordinator: 4, team: 4, work: 4 })).status).toBe(201);
+    // 4 submissions, 2 of them signed: anonymous results still need a third anonymous answer.
+    const dashboardBefore = await call<{ teams: Array<{ openCycle: { thresholdReached: boolean } }> }>(await sessionFor(coordinatorId), "GET", "/api/coordinator/dashboard");
+    expect(dashboardBefore.body.teams[0].openCycle.thresholdReached).toBe(false);
+    db.prepare("UPDATE feedback_cycles SET closes_at = ? WHERE id = 'cycle-now'").run(new Date(Date.now() - 1000).toISOString());
+    expect((await call(other, "POST", "/api/employee/feedback/sign", { cycleId: "cycle-now" })).status).toBe(409);
+    const dashboard = await call<{ signedEvaluations: unknown[] }>(employee, "GET", "/api/employee/dashboard");
+    expect(dashboard.body.signedEvaluations).toHaveLength(1);
+  });
+
+  it("records conversation notes with team members only, shared with the employee", async () => {
+    const coordinator = await sessionFor(coordinatorId);
+    const created = await call<{ id: string }>(coordinator, "POST", "/api/coordinator/conversations", { employeeUserId: employees[0], heldOn: "2026-11-10", notes: "Combinamos revisar os prazos juntos toda segunda." });
+    expect(created.status).toBe(201);
+    const outsider = await invite(admin, "Fora Do Time", ["employee"]);
+    expect((await call(coordinator, "POST", "/api/coordinator/conversations", { employeeUserId: outsider, heldOn: "2026-11-10", notes: "x" })).status).toBe(403);
+    expect((await call(coordinator, "PATCH", `/api/coordinator/conversations/${created.body.id}`, { notes: "Combinamos revisar os prazos juntos toda segunda. Ela vai trazer os bloqueios." })).status).toBe(200);
+    const otherCoordinator = await sessionFor(await invite(admin, "Outra Coordenacao", ["coordinator"]));
+    expect((await call(otherCoordinator, "PATCH", `/api/coordinator/conversations/${created.body.id}`, { notes: "invasão" })).status).toBe(404);
+    const employee = await call<{ conversations: Array<{ heldOn: string; notes: string; coordinatorName: string }> }>(await sessionFor(employees[0]), "GET", "/api/employee/dashboard");
+    expect(employee.body.conversations).toEqual([expect.objectContaining({ heldOn: "2026-11-10", coordinatorName: "Davi Holanda", notes: expect.stringContaining("bloqueios") })]);
+    expect((await call(await sessionFor(employees[1]), "GET", "/api/employee/dashboard")).body).toMatchObject({ conversations: [] });
+    expect((await call(await sessionFor(employees[0]), "GET", "/api/coordinator/people")).status).toBe(403);
+  });
+});

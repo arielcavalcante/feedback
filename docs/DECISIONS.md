@@ -60,7 +60,7 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 
 ## ADR-009 — Employee history is status-only
 
-- **Status:** accepted
+- **Status:** accepted; amended by ADR-027 (signed check-ins are shown back to their author)
 - **Decision:** Show one visual item per eligible past cycle with exactly `done` or `skipped`; do not show the employee their survey answers, comments, or scores, and do not pre-render future cycles.
 - **Why:** Meet the desired lightweight participation-history experience without creating a personal score archive.
 - **Consequences:** Derive the view from eligibility and submission existence; accessible labels must not rely on color alone.
@@ -183,6 +183,13 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 - **Decision:** Cycles are weekly and open all week (Monday 00:00 → Sunday 23:59:59 `America/Fortaleza`), reporting Monday 09:00; the survey keeps its three ratings. Eligibility is re-evaluated on every scheduler tick and when an employee opens the home page, so people who join a team mid-week enter that week's cycle; nobody is added twice and existing snapshots never change. Employees can also send complaints at any time, choosing one or more of ten topics (no leadership topic: feedback about coordination goes through the survey) and an unbounded text (server cap 50,000 characters). Each complaint is addressed to the author's current team and its coordinator.
 - **Privacy:** The author may sign. Signed complaints are shown to the coordinator immediately with the author's name. Anonymous complaints are shown only after the week's report time (next Monday 09:00) and only when at least 3 distinct people complained anonymously in that team that week; they are shown without author, time, or order (random ids), and withheld weeks are listed without counts. The author id is stored confidentially for counting and abuse handling; the audit event for a complaint has no resource id so it cannot link a person to a complaint.
 - **Consequences:** Admins have no complaint view. Below-threshold anonymous complaints never reach anyone; signing is the way to be heard about a one-person issue.
+
+## ADR-027 — Signed check-ins and recorded conversations
+
+- **Status:** accepted (owner decision, 2026-11-09)
+- **Decision:** The weekly check-in has the same "Sign with my name" switch as complaints. Signing identifies that check-in to the coordinator so both can talk about it; it is possible when submitting or later while the week is open, and cannot be undone. Signed check-ins are excluded from anonymous cohorts (threshold, averages, comments, open-cycle bit). Coordinators can record conversation notes (free text, no owner or status) with any current member of a team they coordinate, with or without a signed check-in; notes are editable by their coordinator and visible to that coordinator and the employee. Employees see their own signed check-ins (scores and comment) and every note about them. A person may send many complaints per week, each signed or anonymous.
+- **Why:** Let 1:1 conversations build on real feedback without weakening the anonymity of everyone else.
+- **Consequences:** `feedback_submissions` gains `is_signed`/`signed_at` (migration `0004`). Notes are stored as `meetings` (status `completed`) with one `meeting_outcomes` row of kind `growth_opportunity` and visibility `shared`. Anonymous answers are still never shown back to their author, to avoid pressure to prove what someone answered.
 
 ## Open questions before implementation/launch
 

@@ -3,7 +3,8 @@ import { api, type CurrentUser } from "./api";
 import { useLocale } from "./i18n";
 import { SiteHeader } from "./components/SiteHeader";
 import { SiteFooter } from "./components/SiteFooter";
-import { ErrorMessage, errorText, Field, initials, Primary } from "./components/ui";
+import { ErrorMessage, errorText, Field, formatInZone, initials, Primary, SignToggle } from "./components/ui";
+import { SignedEvaluationCard } from "./components/SignedEvaluationCard";
 import { CoordinatorSection } from "./views/CoordinatorSection";
 import { AdminSection } from "./views/AdminSection";
 import { AboutPage } from "./views/AboutPage";
@@ -460,6 +461,8 @@ function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: 
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [signed, setSigned] = useState(false);
+  const [confirmSign, setConfirmSign] = useState(false);
   const surveyOpen = mode === "survey";
 
   async function loadDashboard() {
@@ -483,13 +486,29 @@ function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: 
     try {
       await api("/api/employee/feedback", {
         method: "POST",
-        body: JSON.stringify({ cycleId: dashboard.activeCycle.id, ...ratings, comment }),
+        body: JSON.stringify({ cycleId: dashboard.activeCycle.id, ...ratings, comment, signed }),
       });
-      setNotice(t("Check-in sent. Thanks for taking the time."));
+      setNotice(t(signed ? "Signed check-in sent. {name} can see it so you two can talk." : "Check-in sent. Thanks for taking the time.", { name: coordinatorName ?? t("your coordinator") }));
       setMode("idle");
       await loadDashboard();
     } catch (caught) {
       setLoadError(errorText(caught, "Unable to send your feedback."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function signThisWeek() {
+    if (!dashboard?.thisWeek) return;
+    setBusy(true);
+    setLoadError("");
+    try {
+      await api("/api/employee/feedback/sign", { method: "POST", body: JSON.stringify({ cycleId: dashboard.thisWeek.cycleId }) });
+      setConfirmSign(false);
+      setNotice(t("Done. {name} can now see this week’s check-in with your name.", { name: coordinatorName ?? t("your coordinator") }));
+      await loadDashboard();
+    } catch (caught) {
+      setLoadError(errorText(caught, "Something went wrong. Please try again."));
     } finally {
       setBusy(false);
     }
@@ -501,6 +520,7 @@ function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: 
   const coordinatorName = dashboard?.team?.coordinatorName ?? null;
 
   return (
+    <>
     <div className="dashboard-layout">
       <section className="active-feedback" id="active-feedback" aria-labelledby="active-feedback-title">
         {notice && mode === "idle" && <p className="success" role="status">{notice}</p>}
@@ -532,6 +552,21 @@ function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: 
               : dashboard.answeredThisWeek
                 ? "A new check-in opens on Monday. Meanwhile, if something is bugging you, you can complain anytime."
                 : "You’ll get a weekly check-in once you’re on a team with a coordinator.")}</p>
+            {dashboard.thisWeek && !dashboard.activeCycle && (
+              dashboard.thisWeek.signed ? (
+                <p className="sign-status"><span className="shell-icon" aria-hidden="true" />{t("You signed this check-in — {name} can see it so you two can talk.", { name: coordinatorName ?? t("your coordinator") })}</p>
+              ) : confirmSign ? (
+                <div className="sign-confirm" role="group" aria-label={t("Sign this week’s check-in")}>
+                  <p>{t("{name} will see this week’s scores and comment with your name. This can’t be undone, and it’s only possible until Sunday.", { name: coordinatorName ?? t("your coordinator") })}</p>
+                  <div>
+                    <button type="button" className="text-button" disabled={busy} onClick={signThisWeek}>{t("Sign check-in")}</button>
+                    <button type="button" className="text-button" onClick={() => setConfirmSign(false)}>{t("Cancel")}</button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" className="text-button sign-later" onClick={() => setConfirmSign(true)}>{t("I want to talk about this check-in with {name}", { name: coordinatorName ?? t("your coordinator") })}</button>
+              )
+            )}
             {dashboard.activeCycle && (
               <dl className="cycle-meta">
                 <div><dt>{t("Team")}</dt><dd>{dashboard.activeCycle.teamName}</dd></div>
@@ -546,6 +581,12 @@ function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: 
                 <RatingField label={t("How do you feel about your team?")} value={ratings.team} onChange={(value) => setRatings({ ...ratings, team: value })} />
                 <RatingField label={t("How do you feel about your work?")} value={ratings.work} onChange={(value) => setRatings({ ...ratings, work: value })} />
                 <label className="comment-field"><span>{t("Anything else you’d like to share? (optional)")}</span><textarea value={comment} maxLength={2000} onChange={(event) => setComment(event.target.value)} /></label>
+                <div className="survey-form__sign">
+                  <SignToggle checked={signed} onChange={setSigned} label={t("Sign with my name")} />
+                  <p className="helper">{signed
+                    ? t("{name} will see your scores and comment with your name so you can talk about them. A signed check-in doesn’t count in the group’s anonymous results.", { name: coordinatorName ?? t("your coordinator") })
+                    : t("Anonymous: it only shows up inside the group’s results. You can still sign it until Sunday if you want to talk about it.")}</p>
+                </div>
                 <ErrorMessage message={loadError} />
                 <Primary busy={busy} disabled={Object.values(ratings).some((rating) => rating === 0)}>{t(busy ? "Sending feedback…" : "Send feedback")}</Primary>
                 <button type="button" className="text-button align-left" onClick={() => setMode("idle")}>{t("Answer later")}</button>
@@ -553,7 +594,7 @@ function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: 
             ) : (
               <div className="action-row">
                 {dashboard.activeCycle && (
-                  <button className="case-link primary" type="button" onClick={() => { setNotice(""); setMode("survey"); }}>
+                  <button className="case-link primary" type="button" onClick={() => { setNotice(""); setSigned(false); setMode("survey"); }}>
                     <span>{t("Answer now")}</span><span className="case-link__icon" aria-hidden="true" />
                   </button>
                 )}
@@ -574,7 +615,7 @@ function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: 
           <div><p className="eyebrow">{t("History")}</p><h2 id="history-title">{t("Your participation")}</h2></div>
           <strong>{dashboard ? t("{count} completed", { count: String(dashboard.history.filter((cycle) => cycle.status === "done").length) }) : "—"}</strong>
         </div>
-        <p>{t("We only show whether you participated. Your answers and scores never appear here.")}</p>
+        <p>{t("Here we only show whether you answered. Scores only show up for the check-ins you signed.")}</p>
         <div className="cycle-grid" aria-label={t("Past feedback cycles")}>
           {dashboard?.history.map((cycle) => (
             <article className={`cycle-square cycle-square--${cycle.status}`} key={cycle.cycleId} aria-label={`${date(cycle.opensAt, { dateStyle: "long" })}: ${t(cycle.status)}`}>
@@ -584,6 +625,48 @@ function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: 
             </article>
           ))}
         </div>
+      </section>
+    </div>
+    {dashboard && <EmployeeConversations dashboard={dashboard} />}
+    </>
+  );
+}
+
+/** The employee's own signed check-ins and the notes from conversations with their coordinator. */
+function EmployeeConversations({ dashboard }: { dashboard: EmployeeDashboardData }) {
+  const { t, locale } = useLocale();
+  const day = (value: string) => formatInZone(`${value}T12:00:00.000Z`, locale, { day: "numeric", month: "long", year: "numeric" });
+  return (
+    <div className="dashboard-layout">
+      <section className="active-feedback" id="conversations" aria-labelledby="conversations-title">
+        <div className="section-heading">
+          <div><p className="eyebrow">{t("Conversations")}</p><h2 id="conversations-title">{t("Points to work on")}</h2></div>
+        </div>
+        <p className="active-feedback__intro">{t("What you and your coordinator agreed on in your conversations. Only the two of you see it.")}</p>
+        {dashboard.conversations.length ? (
+          <ol className="conversation-list">
+            {dashboard.conversations.map((item) => (
+              <li className="conversation-card" key={item.id}>
+                <p className="conversation-card__meta"><time dateTime={item.heldOn}>{day(item.heldOn)}</time> · {t("with {name}", { name: item.coordinatorName })}</p>
+                <p className="conversation-card__notes">{item.notes}</p>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="helper conversation-empty">{t("No conversations recorded yet. Sign a check-in when you want to talk about it.")}</p>
+        )}
+      </section>
+
+      <section className="cycle-history" id="signed-checkins" aria-labelledby="signed-checkins-title">
+        <div className="section-heading">
+          <div><p className="eyebrow">{t("Your check-ins")}</p><h2 id="signed-checkins-title">{t("Signed check-ins")}</h2></div>
+        </div>
+        <p>{t("Only check-ins you signed show up here. Anonymous ones stay anonymous — not even you see them again.")}</p>
+        {dashboard.signedEvaluations.length ? (
+          <ul className="signed-list">{dashboard.signedEvaluations.map((item) => <SignedEvaluationCard key={item.cycleId} evaluation={item} />)}</ul>
+        ) : (
+          <p className="helper conversation-empty">{t("You haven’t signed any check-in yet.")}</p>
+        )}
       </section>
     </div>
   );

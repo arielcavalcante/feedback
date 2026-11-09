@@ -1,7 +1,7 @@
 // Development-only fetch interceptor for `pnpm dev:mock`. It mirrors the response shapes and
 // authorization rules of worker/index.ts with fictional data, so no Worker, D1, or secrets are needed.
 import { devStore, DEV_PERSONAS } from "./store";
-import { handleOrg, recordComplaint } from "./mockOrg";
+import { employeeConversations, handleOrg, recordComplaint, signThisWeek, thisWeekSigned } from "./mockOrg";
 
 type Body = Record<string, unknown>;
 const LATENCY_MS = 220;
@@ -28,6 +28,8 @@ function employeeDashboard() {
   return {
     team: { name: "Praia Sertão — Produto", coordinatorName: coordinator },
     answeredThisWeek: !cycleOpen || submitted,
+    thisWeek: !cycleOpen || submitted ? { cycleId: "dev-cycle-current", closesAt: closesAt.toISOString(), signed: thisWeekSigned() } : null,
+    ...employeeConversations(DEV_PERSONAS.employee.id),
     activeCycle: cycleOpen && !submitted ? {
       id: "dev-cycle-current",
       opensAt: opensAt.toISOString(),
@@ -99,7 +101,16 @@ function handle(method: string, path: string, body: Body): Response {
       if (!cycleOpen || body.cycleId !== "dev-cycle-current") return fail(404, "feedback_unavailable", "This feedback cycle is not available.");
       if (submitted) return fail(409, "feedback_submitted", "You already completed this feedback cycle.");
       devStore.patch({ submitted: true });
+      if (body.signed === true) signThisWeek(DEV_PERSONAS.employee.id, { coordinator: Number(body.coordinator), team: Number(body.team), work: Number(body.work), comment: typeof body.comment === "string" && body.comment.trim() ? body.comment.trim() : null });
       return respond({ ok: true }, 201);
+    }
+    case "POST /api/employee/feedback/sign": {
+      const denied = requireRole("employee");
+      if (denied) return denied;
+      const { cycleOpen, submitted } = devStore.get();
+      if (!(submitted || !cycleOpen) || thisWeekSigned()) return fail(409, "cannot_sign", "This check-in can no longer be signed.");
+      signThisWeek(DEV_PERSONAS.employee.id, { coordinator: 3, team: 4, work: 3, comment: null });
+      return respond({ ok: true });
     }
     default: {
       const reply = handleOrg(method, path, body);

@@ -11,7 +11,9 @@ export async function handleCoordinatorDashboard(request: Request, env: Env): Pr
   // Cohort = cycle × team × this coordinator, from the immutable participant snapshot.
   const cohorts = await env.DB.prepare(`SELECT c.id AS cycleId, p.team_id AS teamId, t.name AS teamName,
       c.opens_at AS opensAt, c.closes_at AS closesAt, c.report_at AS reportAt, c.anonymity_threshold_snapshot AS threshold,
-      COUNT(p.id) AS eligibleCount, COUNT(s.id) AS submittedCount
+      COUNT(p.id) AS eligibleCount,
+      -- Signed check-ins are shown individually (ADR-027) and never count toward anonymous results.
+      COUNT(CASE WHEN s.is_signed = 0 THEN s.id END) AS submittedCount
     FROM feedback_cycle_participants p
     JOIN feedback_cycles c ON c.id = p.cycle_id
     JOIN teams t ON t.id = p.team_id
@@ -41,7 +43,7 @@ export async function handleCoordinatorDashboard(request: Request, env: Env): Pr
     if (latest?.ready && latest.responseCount) {
       const answers = await env.DB.prepare(`SELECT a.dimension, a.numeric_value AS numericValue, a.text_value AS textValue
         FROM feedback_answers a
-        JOIN feedback_submissions s ON s.id = a.submission_id AND s.state = 'submitted'
+        JOIN feedback_submissions s ON s.id = a.submission_id AND s.state = 'submitted' AND s.is_signed = 0
         JOIN feedback_cycle_participants p ON p.id = s.participant_id
         WHERE p.cycle_id = ? AND p.team_id = ? AND p.coordinator_user_id = ? AND p.eligibility_status = 'eligible'
         ORDER BY a.id`).bind(latest.cycleId, teamId, user.id).all<{ dimension: keyof DimensionAverages; numericValue: number | null; textValue: string | null }>();

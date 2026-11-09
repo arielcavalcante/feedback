@@ -178,6 +178,9 @@ export const feedbackSubmissions = sqliteTable("feedback_submissions", {
   state: text("state", { enum: ["submitted", "withdrawn"] }).notNull(),
   schemaVersion: integer("schema_version").notNull(),
   createdAt: text("created_at").notNull(),
+  /** The employee chose to identify this check-in to their coordinator (ADR-027). Never reverted. */
+  isSigned: integer("is_signed", { mode: "boolean" }).notNull().default(false),
+  signedAt: text("signed_at"),
 }, (table) => [uniqueIndex("feedback_submissions_participant_unique").on(table.participantId)]);
 
 export const feedbackAnswers = sqliteTable("feedback_answers", {

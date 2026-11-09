@@ -1,145 +1,177 @@
-# Team Feedback
+# ino — feedback da equipe
 
-Planning repository for a small internal feedback platform. The product runs a private, recurring feedback process while keeping survey respondents anonymous to coordinators and colleagues.
+O **ino** é a plataforma interna de feedback e 1:1 da Praia Sertão. Toda semana, cada pessoa avalia a coordenação, a equipe e o próprio trabalho. A coordenação vê o resultado do grupo sem saber quem respondeu o quê. Quem quiser conversar sobre uma avaliação pode assinar com o próprio nome, e as conversas viram anotações que ficam salvas pros dois. Também tem um botão de reclamar, aberto o tempo todo.
 
-Development has started. The repository now contains a React/Worker foundation, initial D1/Drizzle schema, invitation-only authentication slice, and schedule/holiday primitives; product dashboards remain phased work.
+O nome vem de Ino, que virou Leucoteia na Odisseia: a deusa que dá a Odisseu o véu que o protege na travessia, sem atravessar por ele. A história está em [`/sobre`](https://ino.praiasertao.com.br/sobre).
 
-## Product overview
+Produção: **https://ino.praiasertao.com.br**
 
-Every week, employees can answer a short check-in about their coordinator, team, and work at any time between Monday 00:00 and Sunday 23:59 in `America/Fortaleza`; eligible coordinator results are released Monday at 09:00. A **Reclamar** (complain) button is always available for topics other than leadership (equipment, software, colleagues, working conditions, and more), signed or anonymous. Coordinators use anonymous, aggregated signals in team dashboards and in meeting preparation. Employees can review meeting outcomes and a simple history of whether they completed or skipped each past cycle, but never their survey answers or scores.
+## Sumário
 
-## Architecture
+- [Como funciona](#como-funciona)
+- [Perfis e o que cada um vê](#perfis-e-o-que-cada-um-vê)
+- [Privacidade e anonimato](#privacidade-e-anonimato)
+- [Arquitetura](#arquitetura)
+- [Rodando localmente](#rodando-localmente)
+- [Modo dev com dados fictícios](#modo-dev-com-dados-fictícios)
+- [Testes e verificação](#testes-e-verificação)
+- [Deploy](#deploy)
+- [Operação](#operação)
+- [Documentação](#documentação)
 
-- React, TypeScript, and Vite for the web interface.
-- Brazilian Portuguese as the default interface and transactional-email locale, with the reviewed English copy retained for a future profile preference.
-- Cloudflare Workers with Static Assets for the web app and API.
-- Cloudflare D1 for relational storage, preferably accessed through Drizzle ORM.
-- Admin-issued email invitations, password authentication, and server-managed sessions.
-- Resend for MVP transactional email.
-- Cloudflare Cron Triggers as frequent UTC wake-ups. Application/database logic determines whether a Fortaleza-local event is due; cron expressions do not encode the 14-day recurrence.
+## Como funciona
 
-The Worker is the authorization and privacy boundary. Browser code must never receive hidden survey attribution or raw answers that it does not need.
+### Avaliação da semana
 
-The interface follows the visual language of `ariel-portfolio-react`: Clash Grotesk, fixed navigation, mobile menu, pill actions, and shared interaction patterns. The product uses its own `ino` logo from `public/assets/logo.svg`. Portuguese is the visible default; `?lang=en` remains available for development and localization review until language selection moves to profile settings.
+- Cada semana é um **ciclo**, aberto de **segunda 00h a domingo 23h59** (horário de Fortaleza). A pessoa responde quando quiser dentro da semana, uma vez por ciclo.
+- São três notas de 1 a 5 — **coordenação**, **equipe** e **trabalho** — e um comentário opcional.
+- O resultado da semana sai na **segunda às 9h**, e só se pelo menos **3 pessoas** tiverem respondido anonimamente. Abaixo disso, fica guardado.
+- Quem entra numa equipe no meio da semana já participa do ciclo daquela semana.
+- O histórico do funcionário mostra só se ele **respondeu** ou **não respondeu** em cada semana.
 
-## Roles and capabilities
+### Avaliação assinada e conversas
 
-Users may hold more than one role.
+- Na avaliação tem a chave **"Assinar com meu nome"**. Assinada, ela aparece pra coordenação com nome, notas e comentário, pra vocês conversarem sobre ela.
+- Dá pra assinar ao enviar ou depois, **enquanto a semana estiver aberta**. Assinou, não dá pra desfazer.
+- Avaliação assinada **não entra** na média anônima do grupo.
+- Durante uma conversa, a coordenação abre a pessoa em **Conversas com o time**, vê as avaliações que ela assinou e registra o que combinaram: como cada um pode trabalhar em cima daquilo. Dá pra registrar conversa com qualquer pessoa do time, com ou sem avaliação assinada.
+- As anotações aparecem pro funcionário em **Pontos de atenção**, junto das avaliações que ele assinou.
 
-- **Admin:** manage users, teams, memberships, coordinator assignments, roles, and activation. Privileged survey access is not implied by the role.
-- **Coordinator:** view threshold-protected aggregate team feedback, trends, eligible comments, meeting context, growth goals, recognition, and action items.
-- **Employee:** submit one survey per eligible cycle, see only `done`/`skipped` history for past cycles, and review their own meeting outcomes, action items, and recognition.
+### Reclamar
 
-## Privacy and anonymity
+- O botão **Reclamar** fica disponível o tempo todo, lado a lado com **Bora responder**. Ele é secundário enquanto a avaliação da semana está pendente e vira o principal quando ela já foi feita.
+- A pessoa escolhe um ou mais de 10 temas — máquina e equipamento, software e ferramentas, colegas, condições de trabalho, infraestrutura, fim do home office, processos e burocracia, demandas e prazos, comunicação e outros — e escreve sem limite.
+- Não existe tema de liderança: sobre a coordenação, o caminho é a avaliação da semana.
+- Cada reclamação pode ser **assinada** (a coordenação vê na hora, com nome) ou **anônima** (chega na segunda, referente à semana anterior, só se pelo menos 3 pessoas diferentes reclamaram anonimamente naquela equipe). Dá pra mandar várias por semana, umas assinadas e outras não.
 
-- Survey attribution may be retained confidentially by the system for eligibility, deduplication, reminders, and abuse/security investigations.
-- Coordinators and other employees never receive respondent identity or identity-bearing metadata.
-- Aggregate results and comments stay hidden until the eligible submitted-response count reaches the configured threshold (default `3`).
-- Small segments, filtering, exports, timestamps, topic combinations, and meeting views must not provide an identification side channel.
-- An employee meeting page may use team-level anonymous signals, but never an answer inferred or selected as belonging to that employee.
-- Privileged access is least-privilege, audited, purpose-limited, and not exposed through ordinary admin screens.
+### Administração
 
-See [docs/PRIVACY.md](docs/PRIVACY.md) for the enforceable rules and threat model.
+- Não existe cadastro público. A administração convida as pessoas por e-mail, define os **perfis** de cada uma (admin, coordenação, colaborador — dá pra ter mais de um) e a **equipe**.
+- Cada equipe tem uma coordenação. Quem não está numa equipe com coordenação fica fora dos ciclos.
+- Desativar uma pessoa derruba as sessões dela na hora e mantém o histórico.
 
-## Feedback cycle
+### Primeiro acesso
 
-1. A weekly cycle opens Monday at 00:00 `America/Fortaleza` and stays open all week.
-2. Eligible employees submit quantitative CSAT answers for coordinator, team, and work, with optional qualitative text/topics.
-3. The cycle closes Sunday at 23:59:59 local time. Missing eligible submissions become `skipped` for history/reporting. People added to a team mid-week join that week's cycle.
-4. Monday at 09:00 local time, a coordinator report job is queued. Results are shown only when the anonymity threshold is met.
-5. Future cycles are computed schedules, not stored employee history rows. The employee grid renders one square per past cycle with exactly `done` or `skipped`.
+- O convite chega por e-mail com um link de uso único. A pessoa cria a senha (mínimo de 15 caracteres; uma frase funciona bem) e entra.
+- Quem é colaborador vê uma introdução curta na primeira vez: quem é a coordenação, como funcionam as notas e o histórico.
 
-All persisted instants use UTC. The recurrence anchor and IANA time zone are stored so daylight-saving/time-zone rules remain explicit even though Fortaleza currently does not observe DST.
+## Perfis e o que cada um vê
 
-## MVP scope
+Uma pessoa pode ter vários perfis. A tela inicial mostra as seções de cada um, nesta ordem: colaborador, coordenação, admin.
 
-- Single-use email invitations, safe password storage, session authentication, password reset, and application RBAC.
-- Admin CRUD for users, roles, teams, memberships, coordinator assignments, and activation.
-- D1/Drizzle schema, migrations, seed data, and local development workflow.
-- Biweekly cycle scheduling, survey submission, status-only employee history, reminder/report email jobs, and retry handling.
-- Threshold-safe coordinator aggregates, trends, and qualitative themes/comments.
-- Meeting preparation, meeting outcomes, development pulse/ratings, recognition, growth opportunities, and action items.
-- Employee access to their meeting outcomes, action items, and recognition.
-- Audit logging, accessibility, responsive behavior, observability, and production runbooks.
+| | Colaborador | Coordenação | Admin |
+|---|---|---|---|
+| Responder a avaliação da semana | ✓ | | |
+| Reclamar (assinado ou anônimo) | ✓ | | |
+| Ver o próprio histórico (respondeu / não respondeu) | ✓ | | |
+| Ver as próprias avaliações **assinadas** e os pontos de atenção | ✓ | | |
+| Resultado anônimo do time (médias e comentários, com mínimo de 3) | | ✓ | |
+| Avaliações assinadas e reclamações assinadas do time | | ✓ | |
+| Reclamações anônimas da semana anterior (com mínimo de 3 pessoas) | | ✓ | |
+| Registrar e editar anotações de conversa | | ✓ | |
+| Convidar, editar e desativar pessoas; montar equipes | | | ✓ |
+| Ver respostas ou reclamações | | | ✗ nunca |
 
-## Out of scope for MVP
+## Privacidade e anonimato
 
-- Employees viewing their own survey answers, comments, dimension scores, or aggregate scores.
-- Individual-level survey analytics or coordinator access to respondent identity.
-- AI-generated insights, native mobile apps, public signup, multi-tenant billing, complex org charts, file attachments, and LinkedIn sharing.
-- Calling meeting development ratings “NPS.” They are internal development pulses, not Net Promoter Score.
+O anonimato é a promessa central do produto. As regras completas estão em [`docs/PRIVACY.md`](docs/PRIVACY.md). Em resumo:
 
-## Later ideas
+- O **Worker é a fronteira de autorização**: toda rota confere sessão, perfil e escopo de equipe. Esconder na interface nunca basta.
+- A coordenação nunca recebe autoria, horário exato nem ordem de envio de nada anônimo.
+- Resultados e reclamações anônimas só aparecem com **pelo menos 3 pessoas**. Abaixo disso, a resposta não traz nem a contagem.
+- Durante a semana, a coordenação vê só **se o mínimo já foi atingido**, nunca quantas pessoas responderam (ADR-023).
+- Assinar é sempre escolha da pessoa, item a item. O que é assinado sai do cálculo anônimo, e a avaliação só pode ser assinada até a semana fechar. Assim ninguém consegue deduzir a resposta dos outros por subtração.
+- Respostas anônimas **nunca são mostradas de volta**, nem pra quem respondeu. Isso evita pressão do tipo "me mostra o que tu respondeu".
+- A administração gerencia pessoas e equipes e não tem nenhuma tela de respostas.
+- O sistema guarda a autoria em sigilo (pra contar o mínimo, evitar duplicidade e lidar com abuso), mas os logs e o registro de auditoria não ligam ninguém a uma reclamação anônima.
 
-- **V1.1:** employee-authored pre-1:1 agenda and private talking points, with explicit visibility controls.
-- **V2:** optional, consent-based congratulation art suitable for LinkedIn sharing; richer recognition workflows; carefully evaluated assisted theme summarization.
+## Arquitetura
 
-## Local prerequisites
+- **Front-end:** React 19 + TypeScript + Vite, servido como assets estáticos do Worker.
+- **API:** Cloudflare Worker (`worker/`), que também é a fronteira de autorização e privacidade.
+- **Banco:** Cloudflare D1 (SQLite), schema em Drizzle (`worker/db/schema.ts`) e migrações em `drizzle/`.
+- **Agendamento:** Cron Trigger a cada 15 min. A lógica em `worker/scheduler/` cria os ciclos semanais a partir da âncora guardada no banco, abre e fecha os ciclos e inclui os participantes.
+- **E-mail:** Resend, com template próprio compatível com Outlook (imagens embutidas por CID).
+- **Autenticação:** convite por e-mail com token opaco de uso único, senha com PBKDF2-HMAC-SHA256 + pepper e sessões em cookie `HttpOnly`/`Secure` com token guardado só como hash.
+- **Idioma:** português do Brasil por padrão, com o catálogo em inglês mantido em `shared/localization.ts` (`?lang=en` pra revisar).
+- **Visual:** identidade do portfólio (`ariel-portfolio-react`): Clash Grotesk, papel/tinta/azul/laranja/dourado, menu fixo e botões em pílula.
 
-- Node.js 22 LTS (pin the exact version when implementation begins) and a package manager such as pnpm.
-- A Cloudflare account and Wrangler CLI access.
-- A Resend account, verified sending domain, and API key.
-- GitHub CLI for publishing and creating the prepared backlog.
+```
+src/            interface (App.tsx, views/, components/, dev/ = modo dev)
+worker/         API, autenticação, regras de privacidade, scheduler, e-mail
+  domain/       regras puras e testadas (agenda, privacidade da coordenação, reclamações)
+shared/         textos/traduções e temas de reclamação usados pelos dois lados
+drizzle/        migrações do D1
+docs/           decisões (ADRs), privacidade, setup, modelo de dados
+public/         fontes, ícones e imagens do e-mail
+```
 
-During implementation, keep secrets in local environment files excluded by Git and in Cloudflare secrets for deployed environments. Never commit tokens or production personal data.
+## Rodando localmente
 
-## Local development
+Requisitos: Node 22, pnpm 11 e uma conta Cloudflare com acesso ao Worker/D1 `feedback`.
 
 ```sh
 pnpm install
-cp .dev.vars.example .dev.vars
+cp .dev.vars.example .dev.vars        # segredos locais (não vão pro git)
 pnpm db:migrate:local
+pnpm admin:bootstrap -- voce@praiasertao.com.br "Seu Nome"   # cria o primeiro admin local e imprime o link de convite
 pnpm dev
 ```
 
-### Dev mode with fictional data
+Em ambiente local, o e-mail não é enviado: o link do convite aparece na própria tela de admin.
+
+## Modo dev com dados fictícios
 
 ```sh
 pnpm dev:mock
 ```
 
-Runs only the React app (no Worker, D1, or `.dev.vars`) with a fake API in `src/dev/` that mirrors the real response shapes and role checks. A bar at the top switches between **Admin**, **Coordenador**, **Funcionário**, and **Deslogado**, toggles the employee's open cycle, picks a coordinator scenario (results ready, open cycle below/at the minimum, awaiting Monday's report, below minimum, no cycles, no team), and can replay the first-visit introduction. Admin changes are kept in memory until the page reloads. Any email/password signs in as the selected profile. `pnpm build:mock` writes a static copy to `dist-mock/` for sharing a design preview. The production build never includes this code; `scripts/assert-safe-build.mjs` fails if it does.
+Roda só o React, sem Worker, D1 nem `.dev.vars`, com uma API falsa (`src/dev/`) que segue os mesmos formatos e regras da real. Uma barra preta no topo deixa navegar como **Admin**, **Coordenador**, **Funcionário** ou **Deslogado**, marcar se a avaliação da semana está pendente, escolher o cenário da coordenação (resultado pronto, ciclo aberto com ou sem o mínimo, aguardando segunda, sem mínimo, sem ciclos, sem equipe) e rever a introdução. Qualquer e-mail e senha entram.
 
-Run `pnpm check` before committing. It type-checks, tests, validates Drizzle migrations, and builds the Worker plus React client. The API exposes `/api/health`; invitation acceptance, login/logout, session lookup, and password reset; employee dashboard and submission; the coordinator dashboard (`/api/coordinator/dashboard`); and admin people/team management (`/api/admin/users`, `/api/admin/teams`, `/api/admin/invitations`). The scheduler snapshots eligible participants when a cycle opens. `/sobre` is a public page about the product's name. The first production administrator is created with the operator command documented in `docs/SETUP.md`.
+`pnpm build:mock` gera uma versão estática em `dist-mock/` pra compartilhar uma prévia. O build de produção nunca inclui esse código: o `scripts/assert-safe-build.mjs` falha se incluir.
 
-The production build temporarily excludes `.dev.vars` and scans `dist` for secret files/markers before succeeding. `pnpm preview` follows Cloudflare's local-preview behavior and may copy `.dev.vars` into ignored build output; Cloudflare documents that this preview copy is not deployed.
-
-The verified production D1 ID is configured in `wrangler.jsonc`. The application origin is `https://ino.praiasertao.com.br`; production secrets are `AUTH_PEPPER` and `RESEND_API_KEY`.
-
-## Deployment prerequisites
-
-Before production deployment, an owner must:
-
-1. Create/select Cloudflare accounts, Worker/D1 resources, environments, and custom domains.
-2. Configure the production application origin, session/signing secrets, password pepper, rate limiting, and Turnstile if the auth spike adopts it.
-3. Verify a Resend sending domain and choose sender/reply-to addresses for invitations, password resets, reminders, and reports.
-4. Confirm invite lifetime, session lifetime, password-reset policy, cycle anchor date, initial team membership, anonymity threshold, retention periods, privacy notice, and named privacy administrators.
-5. Configure GitHub environments/secrets, production observability, backups/export policy, and incident ownership.
-
-## Account creation and authentication
-
-There is no public signup. An admin creates a user and sends an invitation email. The invitation URL contains a cryptographically random, single-use opaque token—not the email address. The server stores only the token digest and binds it to the invited user/email. After following the link, the page displays the bound email as read-only and asks the user to create a password.
-
-Passwords are never stored or encrypted reversibly. Prefer Argon2id with OWASP-recommended parameters if a Worker compatibility/performance spike succeeds; otherwise use versioned PBKDF2-HMAC-SHA-256 through Workers Web Crypto with a unique random salt, a production-tuned work factor, and an optional pepper kept in a Worker secret. Sessions use random opaque tokens stored only as digests server-side and sent in `Secure`, `HttpOnly`, `SameSite=Lax` cookies. Invitations and reset tokens expire, are single-use, and are invalidated transactionally.
-
-The invite/reset pages use HTTPS, a fixed allowlisted application origin, `Referrer-Policy: no-referrer`, generic error responses, and rate limiting. Without MFA, the initial policy is at least 15 characters and supports up to at least 128, with Unicode/whitespace and password-manager paste supported, no composition rules, no silent truncation, and no forced periodic changes. Screen common/breached passwords without disclosing plaintext. TOTP MFA is required for administrators before the production pilot; its implementation remains a release blocker.
-
-## Planning documents
-
-- [Roadmap and acceptance criteria](ROADMAP.md)
-- [Proposed relational data model](docs/DATA_MODEL.md)
-- [Privacy and anonymity rules](docs/PRIVACY.md)
-- [Architecture decisions and open questions](docs/DECISIONS.md)
-- [Prepared GitHub backlog](docs/GITHUB_ISSUES.md)
-- [Accepted setup choices and operator actions](docs/SETUP.md)
-
-## Publishing to GitHub
-
-The local repository is ready to publish, but GitHub authentication must be valid:
+## Testes e verificação
 
 ```sh
-gh auth login -h github.com
-./scripts/create-github-issues.sh
+pnpm check     # typecheck + testes + checagem das migrações + build seguro
 ```
 
-Run these commands from the repository root. The repository already exists as `feedback`; the script is idempotent by exact issue title and creates labels plus the planned issues.
+- Os testes de domínio cobrem a agenda semanal, o mínimo de 3 (n-1, n, n+1), reclamações e assinatura.
+- `worker/integration.test.ts` roda a API inteira contra as migrações reais usando o SQLite do Node no lugar do D1: convites, perfis, equipes, ciclos, avaliações assinadas, conversas e reclamações, incluindo quem não pode ver o quê.
+- `shared/localization.test.ts` garante que todo texto da interface tem tradução.
+
+## Deploy
+
+```sh
+git push origin dev
+pnpm check
+pnpm run deploy               # build seguro + wrangler deploy ("pnpm deploy", sem o run, é outro comando do pnpm)
+pnpm run db:migrate:remote    # depois do deploy, quando houver migração nova
+```
+
+- O domínio, o banco D1 e o cron já estão no `wrangler.jsonc`.
+- Segredos de produção (no Cloudflare, nunca no git): `AUTH_PEPPER` e `RESEND_API_KEY`.
+- Publique o código antes de rodar migrações que mudam a agenda, pra o scheduler já no ar não criar ciclos com a regra antiga.
+- Confira com `curl https://ino.praiasertao.com.br/api/health`.
+
+## Operação
+
+- **Primeiro admin em produção:** `pnpm admin:bootstrap -- email "Nome" --remote` (ver `docs/SETUP.md`).
+- **Consultar o banco:** `pnpm exec wrangler d1 execute feedback --remote --command "SELECT ..."`. Faça um `wrangler d1 export` antes de qualquer alteração manual. Mudanças de pessoas e equipes devem ser feitas pela tela de admin, que já revoga sessões e registra auditoria.
+- **Feriados:** tabela `holidays`. Precisa ser revisada a cada ano.
+- **E-mail:** os envios aparecem no painel do Resend. O domínio de envio é `mail.praiasertao.com.br`.
+
+### Pendências conhecidas
+
+- MFA (TOTP) pros admins, que é pré-requisito do piloto segundo `docs/SETUP.md`.
+- E-mails de lembrete da avaliação e de aviso de resultado pronto.
+- Revisão jurídica de privacidade e retenção de dados antes de ampliar o uso.
+
+## Documentação
+
+- [Decisões de arquitetura (ADRs)](docs/DECISIONS.md)
+- [Privacidade e anonimato](docs/PRIVACY.md)
+- [Setup e decisões operacionais](docs/SETUP.md)
+- [Modelo de dados](docs/DATA_MODEL.md)
+- [Roadmap](ROADMAP.md)
+- [Regras para agentes de código](AGENTS.md)

@@ -6,7 +6,7 @@ This model must be reviewed with the organization's legal/privacy owner before p
 
 ## Actors and trust boundaries
 
-- **Employee:** may submit their eligible survey once and see only `done`/`skipped` status for their own past cycles.
+- **Employee:** may submit their eligible survey once per week and see only `done`/`skipped` status for their own past cycles, plus their own signed check-ins and conversation notes.
 - **Coordinator:** may see authorized team-level results only after privacy checks; never respondent attribution.
 - **Admin:** may manage users/teams/roles but has no survey-content access by default.
 - **Privacy administrator:** optional named, least-privilege operational role for exceptional investigations; not part of ordinary UI.
@@ -21,10 +21,17 @@ This model must be reviewed with the organization's legal/privacy owner before p
 4. Filters cannot reduce a visible cohort below threshold. Combining endpoints, neighboring cycles, dimensions, topics, exports, or meeting context must not enable differencing attacks.
 5. Results are authorized by server-side current/historical team assignment. Client-side role checks are presentation only.
 6. An employee meeting view may show only privacy-approved team-level signals and must not select, imply, or narrate a response as that employee's.
-7. The employee history projection contains only past cycle label/date and `done`/`skipped`.
+7. The employee history projection contains only past cycle label/date and `done`/`skipped`. Scores and comments are shown back only for check-ins the employee signed; anonymous answers are never shown back, so nobody can be pressured to reveal them.
 8. Logs, traces, analytics, error reports, emails, and support tooling contain no raw answer text, numeric response values linked to identity, identity tokens, or hidden attribution.
 9. Ordinary admin features cannot access raw submissions/answers.
 10. Privacy-sensitive access and configuration changes are audited without copying sensitive content into the audit trail.
+
+## Signed check-ins and complaints (ADR-026, ADR-027)
+
+- Signing is the employee's explicit, per-item choice. A signed check-in or complaint is shown to the coordinator with the author's name; anonymous ones keep every rule in this document.
+- A check-in can be signed only while its week is open, and signing cannot be undone. Signing after results exist, or un-signing after the coordinator saw it, would let anyone subtract one person's answer from a group average.
+- Signed check-ins never count toward anonymous cohorts: thresholds, averages, comments, and the open-cycle threshold bit consider anonymous submissions only.
+- Conversation notes are written by the coordinator and visible only to that coordinator and the employee. Coordinators can record conversations only with current members of teams they coordinate.
 
 ## Threshold and cohort policy
 

@@ -266,6 +266,36 @@ small, .helper { color: color-mix(in srgb, var(--brand-blue) 72%, var(--paper));
 .complaint-card__by { color: var(--brand-blue); font-size: 13px; font-weight: 600; }
 .complaints-panel__empty, .complaints-panel__withheld { margin-top: 28px; }
 
+/* Signed check-ins and conversations. */
+.survey-form__sign { display: grid; gap: 10px; }
+.survey-form__sign .helper { max-width: 560px; }
+.sign-status { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; color: var(--brand-blue); font-size: 15px; font-weight: 500; }
+.sign-status .shell-icon { color: var(--gold); }
+.sign-later { margin-bottom: 28px; text-align: left; text-decoration: underline; text-underline-offset: .25em; }
+.sign-confirm { display: grid; gap: 12px; max-width: 560px; margin-bottom: 28px; padding: 18px 20px; border-radius: 16px; background: color-mix(in srgb, var(--gold) 22%, var(--paper)); font-size: 15px; line-height: 1.45; }
+.sign-confirm > div { display: flex; flex-wrap: wrap; gap: 20px; }
+.sign-confirm .text-button:first-child { color: var(--orange); }
+.conversation-list, .signed-list { display: grid; gap: 12px; margin: 28px 0 0; padding: 0; list-style: none; }
+.conversation-card, .signed-card { display: grid; gap: 10px; padding: 18px 20px; border-radius: 18px; background: color-mix(in srgb, var(--brand-blue) 6%, var(--paper)); }
+.conversation-card__meta, .signed-card__week { color: var(--brand-blue); font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.conversation-card__notes { font-size: 16px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
+.conversation-card .text-button { justify-self: start; font-size: 14px; }
+.conversation-empty { margin-top: 28px; }
+.signed-card__scores { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.signed-card__scores div { display: grid; gap: 2px; }
+.signed-card__scores dt { color: var(--brand-blue); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.signed-card__scores dd { margin: 0; color: var(--brand-blue); font-size: 30px; font-weight: 500; line-height: 1; letter-spacing: -.03em; }
+.signed-card__comment { font-size: 15px; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
+.team-people { padding: clamp(48px, 5vw, 78px) clamp(8px, 3vw, 46px); background: var(--paper); }
+.person-row.is-open { align-items: start; }
+.person-panel { display: grid; grid-column: 1 / -1; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: clamp(20px, 3vw, 40px); margin-top: 8px; padding-top: 20px; border-top: 1px solid color-mix(in srgb, var(--brand-blue) 12%, transparent); }
+.person-panel h3 { margin: 0 0 4px; color: var(--brand-blue); font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+.person-panel .signed-list, .person-panel .conversation-list { margin-top: 14px; }
+.person-panel .signed-card, .person-panel .conversation-card { background: var(--paper); }
+.conversation-form { display: grid; gap: 16px; margin-top: 14px; }
+.conversation-form input[type="date"] { max-width: 220px; background: var(--paper); }
+.conversation-form textarea { min-height: 180px; padding: 14px; resize: vertical; border-radius: 14px; background: var(--paper); font-size: 16px; line-height: 1.5; field-sizing: content; }
+
 /* Administration. */
 .admin-panel { padding: clamp(48px, 5vw, 78px) clamp(8px, 3vw, 46px); background: var(--paper); }
 .admin-panel__intro { max-width: 680px; margin-top: 28px; font-size: 18px; line-height: 1.45; }
@@ -379,7 +409,8 @@ select:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 38%, transpa
   .active-feedback, .cycle-history { padding: 56px 8px 64px; }
   .cycle-meta { grid-template-columns: 1fr; }
   .score-grid { grid-template-columns: 1fr; }
-  .complaints-panel { padding: 56px 8px 64px; }
+  .complaints-panel, .team-people { padding: 56px 8px 64px; }
+  .person-panel { grid-template-columns: 1fr; }
   .action-row { grid-template-columns: 1fr; }
   .admin-panel { padding: 56px 8px 64px; }
   .admin-row, .admin-row--team { grid-template-columns: 44px minmax(0, 1fr); gap: 12px 14px; }

@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { api } from "../api";
 import { useLocale } from "../i18n";
-import { ErrorMessage, errorText, Primary } from "../components/ui";
+import { ErrorMessage, errorText, Primary, SignToggle } from "../components/ui";
 import { COMPLAINT_MAX_LENGTH, COMPLAINT_TOPICS } from "../../shared/complaints";
 
 export function ComplaintForm({ coordinatorName, onSent, onCancel }: {
@@ -58,11 +58,7 @@ export function ComplaintForm({ coordinatorName, onSent, onCancel }: {
         <textarea id={`${id}-text`} value={text} maxLength={COMPLAINT_MAX_LENGTH} required onChange={(event) => setText(event.target.value)} />
       </label>
 
-      <label className={`sign-toggle${signed ? " is-on" : ""}`}>
-        <input type="checkbox" checked={signed} onChange={(event) => setSigned(event.target.checked)} />
-        <span className="sign-toggle__switch" aria-hidden="true" />
-        <span className="sign-toggle__label">{t("Sign with my name")}</span>
-      </label>
+      <SignToggle checked={signed} onChange={setSigned} label={t("Sign with my name")} />
       <p className="helper complaint-form__privacy">
         {signed
           ? t("{name} sees your name and this complaint right away.", { name: coordinatorName })

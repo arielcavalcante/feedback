@@ -7,8 +7,8 @@ export function SiteHeader({ user, onSignOut, introMode = false }: { user: Curre
   const signedIn = Boolean(user);
   // Section anchors follow the role sections rendered on the home page.
   const sectionLinks = [
-    ...(user?.roles.includes("employee") ? [{ href: "#active-feedback", label: "This week" }, { href: "#history", label: "History" }] : []),
-    ...(user?.roles.includes("coordinator") ? [{ href: "#team-results", label: "My team" }, { href: "#team-complaints", label: "Complaints" }] : []),
+    ...(user?.roles.includes("employee") ? [{ href: "#active-feedback", label: "This week" }, { href: "#conversations", label: "Conversations" }] : []),
+    ...(user?.roles.includes("coordinator") ? [{ href: "#team-results", label: "My team" }, { href: "#team-people", label: "Conversations" }, { href: "#team-complaints", label: "Complaints" }] : []),
     ...(user?.roles.includes("admin") ? [{ href: "#people", label: "People" }, { href: "#teams", label: "Teams" }] : []),
   ];
   const [menuOpen, setMenuOpen] = useState(false);

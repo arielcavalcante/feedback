@@ -10,6 +10,7 @@ import { sendAccountEmail } from "./email";
 import { assertSameOrigin, HttpError, json, readJson } from "./http";
 import { runScheduler, snapshotParticipants } from "./scheduler/run";
 import { currentTeam, handleSubmitComplaint } from "./complaints";
+import { employeeConversations, handleCoordinatorPeople, handleCreateConversation, handleSignFeedback, handleUpdateConversation } from "./conversations";
 import { formatDate, requestLocale, translate } from "../shared/localization";
 
 const API_ERROR = "The email or password is incorrect.";
@@ -36,6 +37,11 @@ export default {
       if (request.method === "POST" && url.pathname === "/api/auth/password-reset/accept") return await handleResetAccept(request, env);
       if (request.method === "POST" && url.pathname === "/api/admin/invitations") return await handleCreateInvitation(request, env);
       if (request.method === "GET" && url.pathname === "/api/employee/dashboard") return await handleEmployeeDashboard(request, env);
+      if (request.method === "POST" && url.pathname === "/api/employee/feedback/sign") return await handleSignFeedback(request, env);
+      if (request.method === "GET" && url.pathname === "/api/coordinator/people") return await handleCoordinatorPeople(request, env);
+      if (request.method === "POST" && url.pathname === "/api/coordinator/conversations") return await handleCreateConversation(request, env);
+      const conversation = url.pathname.match(/^\/api\/coordinator\/conversations\/([A-Za-z0-9-]{1,64})$/);
+      if (request.method === "PATCH" && conversation) return await handleUpdateConversation(request, env, conversation[1]);
       if (request.method === "POST" && url.pathname === "/api/employee/complaints") return await handleSubmitComplaint(request, env);
       if (request.method === "GET" && url.pathname === "/api/coordinator/dashboard") return await handleCoordinatorDashboard(request, env);
       if (request.method === "GET" && url.pathname === "/api/admin/users") return await handleAdminUsers(request, env);
@@ -239,6 +245,7 @@ type EmployeeCycleRow = {
   teamName: string;
   coordinatorName: string;
   submissionId: string | null;
+  isSigned: number | null;
 };
 
 async function handleEmployeeDashboard(request: Request, env: Env): Promise<Response> {
@@ -248,7 +255,7 @@ async function handleEmployeeDashboard(request: Request, env: Env): Promise<Resp
   if (schedules.results.length) await env.DB.batch(schedules.results.map((schedule) => snapshotParticipants(env, schedule.id, now)));
   const rows = await env.DB.prepare(`SELECT c.id AS cycleId, c.opens_at AS opensAt, c.closes_at AS closesAt,
       c.status AS cycleStatus, t.name AS teamName, coordinator.display_name AS coordinatorName,
-      s.id AS submissionId
+      s.id AS submissionId, s.is_signed AS isSigned
     FROM feedback_cycle_participants participant
     JOIN feedback_cycles c ON c.id = participant.cycle_id
     JOIN teams t ON t.id = participant.team_id
@@ -259,7 +266,8 @@ async function handleEmployeeDashboard(request: Request, env: Env): Promise<Resp
     ORDER BY c.opens_at DESC`).bind(user.id, now).all<EmployeeCycleRow>();
 
   const activeRow = rows.results.find((row) => row.cycleStatus === "open" && row.opensAt <= now && row.closesAt > now && !row.submissionId);
-  const answeredThisWeek = rows.results.some((row) => row.cycleStatus === "open" && row.opensAt <= now && row.closesAt > now && row.submissionId);
+  const answeredRow = rows.results.find((row) => row.cycleStatus === "open" && row.opensAt <= now && row.closesAt > now && row.submissionId);
+  const answeredThisWeek = Boolean(answeredRow);
   const history = rows.results
     .filter((row) => row.closesAt <= now || row.cycleStatus === "closed" || row.cycleStatus === "reported")
     .map((row) => ({ cycleId: row.cycleId, opensAt: row.opensAt, status: row.submissionId ? "done" as const : "skipped" as const }));
@@ -267,9 +275,14 @@ async function handleEmployeeDashboard(request: Request, env: Env): Promise<Resp
   // Current team and coordination, independent of any cycle (used by the introduction's org chart).
   const team = await currentTeam(env, user.id);
 
+  const { signedEvaluations, conversations } = await employeeConversations(env, user.id);
+
   return json({
     team: team ? { name: team.teamName, coordinatorName: team.coordinatorName ?? null } : null,
     answeredThisWeek,
+    thisWeek: answeredRow ? { cycleId: answeredRow.cycleId, closesAt: answeredRow.closesAt, signed: Boolean(answeredRow.isSigned) } : null,
+    signedEvaluations,
+    conversations,
     activeCycle: activeRow ? {
       id: activeRow.cycleId,
       opensAt: activeRow.opensAt,
@@ -283,7 +296,7 @@ async function handleEmployeeDashboard(request: Request, env: Env): Promise<Resp
 
 async function handleEmployeeFeedback(request: Request, env: Env): Promise<Response> {
   const user = await requireRole(request, env, "employee");
-  const body = await readJson<{ cycleId?: unknown; coordinator?: unknown; team?: unknown; work?: unknown; comment?: unknown }>(request, 12_000);
+  const body = await readJson<{ cycleId?: unknown; coordinator?: unknown; team?: unknown; work?: unknown; comment?: unknown; signed?: unknown }>(request, 12_000);
   if (typeof body.cycleId !== "string") throw new HttpError(400, "invalid_feedback", "Choose an active feedback cycle.");
   const ratings = [body.coordinator, body.team, body.work];
   if (!ratings.every((rating) => Number.isInteger(rating) && Number(rating) >= 1 && Number(rating) <= 5)) {
@@ -293,6 +306,8 @@ async function handleEmployeeFeedback(request: Request, env: Env): Promise<Respo
     throw new HttpError(400, "invalid_feedback", "The optional comment must have no more than 2,000 characters.");
   }
 
+  if (body.signed !== undefined && typeof body.signed !== "boolean") throw new HttpError(400, "invalid_feedback", "Rate every feedback area from 1 to 5.");
+  const signed = body.signed === true;
   const now = new Date().toISOString();
   const participant = await env.DB.prepare(`SELECT participant.id
     FROM feedback_cycle_participants participant
@@ -311,8 +326,8 @@ async function handleEmployeeFeedback(request: Request, env: Env): Promise<Respo
     { dimension: "work", questionKey: "work_csat", value: Number(body.work) },
   ];
   const statements = [
-    env.DB.prepare("INSERT INTO feedback_submissions (id, cycle_id, participant_id, submitted_at, state, schema_version, created_at) VALUES (?, ?, ?, ?, 'submitted', 1, ?)")
-      .bind(submissionId, body.cycleId, participant.id, now, now),
+    env.DB.prepare("INSERT INTO feedback_submissions (id, cycle_id, participant_id, submitted_at, state, schema_version, created_at, is_signed, signed_at) VALUES (?, ?, ?, ?, 'submitted', 1, ?, ?, ?)")
+      .bind(submissionId, body.cycleId, participant.id, now, now, signed ? 1 : 0, signed ? now : null),
     ...answers.map((answer) => env.DB.prepare("INSERT INTO feedback_answers (id, submission_id, dimension, question_key, numeric_value, created_at) VALUES (?, ?, ?, ?, ?, ?)")
       .bind(crypto.randomUUID(), submissionId, answer.dimension, answer.questionKey, answer.value, now)),
   ];

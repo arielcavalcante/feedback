@@ -6,6 +6,9 @@ export type RoleKey = CurrentUser["roles"][number];
 export type EmployeeDashboardData = {
   team: null | { name: string; coordinatorName: string | null };
   answeredThisWeek: boolean;
+  thisWeek: null | { cycleId: string; closesAt: string; signed: boolean };
+  signedEvaluations: SignedEvaluation[];
+  conversations: Conversation[];
   activeCycle: null | { id: string; opensAt: string; closesAt: string; teamName: string; coordinatorName: string; coordinatorAvatarUrl?: string };
   history: Array<{ cycleId: string; opensAt: string; status: "done" | "skipped" }>;
 };
@@ -47,3 +50,7 @@ export type AdminUser = {
 };
 
 export type AdminTeam = { id: string; name: string; isActive: boolean; coordinatorUserId: string | null; memberCount: number };
+
+export type SignedEvaluation = { cycleId: string; weekStart: string; coordinator: number; team: number; work: number; comment: string | null };
+export type Conversation = { id: string; heldOn: string; coordinatorName: string; notes: string; updatedAt: string };
+export type TeamPerson = { id: string; name: string; teamId: string; teamName: string; signedEvaluations: SignedEvaluation[]; conversations: Conversation[] };

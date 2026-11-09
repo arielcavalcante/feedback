@@ -1,6 +1,6 @@
 // Development-only fictional organization for `pnpm dev:mock`: admin CRUD and coordinator views.
 // Mirrors worker/admin.ts and worker/coordinator.ts response shapes and guards.
-import type { AdminTeam, AdminUser, CoordinatorComplaints, CoordinatorDashboardData, CoordinatorTeam, RoleKey } from "../types";
+import type { AdminTeam, AdminUser, CoordinatorComplaints, CoordinatorDashboardData, CoordinatorTeam, Conversation, RoleKey, SignedEvaluation, TeamPerson } from "../types";
 import { COMPLAINT_MAX_LENGTH, COMPLAINT_TOPIC_KEYS } from "../../shared/complaints";
 import { devStore, DEV_PERSONAS } from "./store";
 
@@ -129,6 +129,34 @@ export function handleOrg(method: string, path: string, body: Body): Reply | nul
     return fail(404, "not_found", "Route not found.");
   }
 
+  if (path.startsWith("/api/coordinator/") && path !== "/api/coordinator/dashboard") {
+    if (!devStore.get().signedIn) return fail(401, "unauthenticated", "Please sign in.");
+    if (!devStore.persona().roles.includes("coordinator")) return fail(403, "forbidden", "You do not have access to this action.");
+    if (method === "GET" && path === "/api/coordinator/people") return ok({ people: teamPeople() });
+    if (method === "POST" && path === "/api/coordinator/conversations") {
+      const notes = typeof body.notes === "string" ? body.notes.trim() : "";
+      if (!notes) return fail(400, "invalid_conversation", "Write what you agreed on.");
+      if (typeof body.heldOn !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(body.heldOn)) return fail(400, "invalid_conversation", "Choose the date of the conversation.");
+      if (!teamPeople().some((person) => person.id === body.employeeUserId)) return fail(403, "forbidden", "Choose someone from your team.");
+      const id = crypto.randomUUID();
+      conversations.unshift({ id, employeeUserId: body.employeeUserId as string, heldOn: body.heldOn, coordinatorName: DEV_PERSONAS.coordinator.displayName, notes, updatedAt: new Date().toISOString() });
+      return ok({ ok: true, id }, 201);
+    }
+    const match = path.match(/^\/api\/coordinator\/conversations\/([A-Za-z0-9-]+)$/);
+    if (method === "PATCH" && match) {
+      const item = conversations.find((conversation) => conversation.id === match[1]);
+      if (!item) return fail(404, "conversation_not_found", "Conversation not found.");
+      const notes = typeof body.notes === "string" ? body.notes.trim() : "";
+      if (!notes) return fail(400, "invalid_conversation", "Write what you agreed on.");
+      item.notes = notes;
+      if (typeof body.heldOn === "string") item.heldOn = body.heldOn;
+      item.updatedAt = new Date().toISOString();
+      conversations.sort((a, b) => b.heldOn.localeCompare(a.heldOn));
+      return ok({ ok: true });
+    }
+    return fail(404, "not_found", "Route not found.");
+  }
+
   if (method === "GET" && path === "/api/coordinator/dashboard") {
     if (!devStore.get().signedIn) return fail(401, "unauthenticated", "Please sign in.");
     if (!devStore.persona().roles.includes("coordinator")) return fail(403, "forbidden", "You do not have access to this action.");
@@ -216,4 +244,36 @@ function sampleComplaints(withSamples: boolean): CoordinatorComplaints {
     }],
     withheldWeeks: [mondayOf(2)],
   };
+}
+
+// Signed check-ins and conversation notes, shared by the employee and coordinator personas.
+const signed = new Map<string, SignedEvaluation[]>([
+  [DEV_PERSONAS.employee.id, [{ cycleId: "dev-past-1", weekStart: cycleAt(-1).opensAt, coordinator: 3, team: 4, work: 2, comment: "Tô me sentindo sobrecarregada com as demandas de última hora. Queria conversar sobre como a gente prioriza." }]],
+]);
+const conversations: Array<Conversation & { employeeUserId: string }> = [
+  { id: "dev-conv-1", employeeUserId: DEV_PERSONAS.employee.id, heldOn: cycleAt(-1).reportAt.slice(0, 10), coordinatorName: DEV_PERSONAS.coordinator.displayName, updatedAt: cycleAt(-1).reportAt,
+    notes: "Falamos sobre as demandas de última hora.\n\n• Davi vai segurar pedidos novos até a daily seguinte, salvo urgência real.\n• Lia vai sinalizar no canal do time quando estiver com mais de 3 entregas abertas.\n• Revisar na próxima conversa se melhorou." },
+];
+
+export function thisWeekSigned() {
+  return (signed.get(DEV_PERSONAS.employee.id) ?? []).some((item) => item.cycleId === "dev-cycle-current");
+}
+
+export function signThisWeek(userId: string, scores: Omit<SignedEvaluation, "cycleId" | "weekStart">) {
+  const list = signed.get(userId) ?? [];
+  if (!list.some((item) => item.cycleId === "dev-cycle-current")) list.unshift({ cycleId: "dev-cycle-current", weekStart: cycleAt(0).opensAt, ...scores });
+  signed.set(userId, list);
+}
+
+export function employeeConversations(userId: string) {
+  return {
+    signedEvaluations: signed.get(userId) ?? [],
+    conversations: conversations.filter((item) => item.employeeUserId === userId).map(({ employeeUserId: _omit, ...item }) => item),
+  };
+}
+
+function teamPeople(): TeamPerson[] {
+  return users
+    .filter((user) => user.teamId === "team-produto" && user.status !== "inactive" && user.roles.includes("employee"))
+    .map((user) => ({ id: user.id, name: user.displayName, teamId: "team-produto", teamName: "Praia Sertão — Produto", ...employeeConversations(user.id) }));
 }

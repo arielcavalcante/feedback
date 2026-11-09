@@ -4,6 +4,7 @@ import { useLocale } from "../i18n";
 import { ErrorMessage, errorText, formatInZone } from "../components/ui";
 import type { CoordinatorComplaints, CoordinatorDashboardData, CoordinatorTeam, DimensionAverages } from "../types";
 import { COMPLAINT_TOPICS } from "../../shared/complaints";
+import { TeamConversations } from "./TeamConversations";
 
 const DIMENSIONS: Array<{ key: keyof DimensionAverages; label: string }> = [
   { key: "coordinator", label: "Coordinator" },
@@ -41,7 +42,7 @@ export function CoordinatorSection() {
     );
   }
 
-  return <>{data.teams.map((team, index) => <TeamResults key={team.id} team={team} nextCycle={data.nextCycle} anchor={index === 0} showName={data.teams.length > 1} />)}</>;
+  return <>{data.teams.map((team, index) => <TeamResults key={team.id} team={team} nextCycle={data.nextCycle} anchor={index === 0} showName={data.teams.length > 1} />)}<TeamConversations /></>;
 }
 
 function TeamResults({ team, nextCycle, anchor, showName }: { team: CoordinatorTeam; nextCycle: CoordinatorDashboardData["nextCycle"]; anchor: boolean; showName: boolean }) {
@@ -161,7 +162,7 @@ function ReadyResults({ latest, eyebrow, titleId }: { latest: Extract<Coordinato
         <div><p className="eyebrow">{eyebrow}</p><h2 id={titleId}>{t("How the team is doing")}</h2></div>
         <span className="status-pill status-pill--ready">{t("{count} answers", { count: String(latest.responseCount) })}</span>
       </div>
-      <p className="active-feedback__intro">{t("Cycle of {date}. Averages from 1 to 5, with no names and no answer order.", { date: formatInZone(latest.opensAt, locale, { day: "numeric", month: "long" }) })}</p>
+      <p className="active-feedback__intro">{t("Week of {date}. Anonymous averages from 1 to 5, with no names and no answer order. Signed check-ins don’t count here — they’re in Conversations.", { date: formatInZone(latest.opensAt, locale, { day: "numeric", month: "long" }) })}</p>
       <div className="score-grid">
         {DIMENSIONS.map(({ key, label }) => (
           <div className="score-tile" key={key}>

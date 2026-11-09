@@ -66,3 +66,14 @@ export function Field(props: {
 export function formatInZone(value: string, locale: string, options: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat(locale === "en" ? "en-US" : "pt-BR", { timeZone: "America/Fortaleza", ...options }).format(new Date(value));
 }
+
+/** "Sign with my name" switch, shared by the weekly check-in and complaints. */
+export function SignToggle({ checked, onChange, label }: { checked: boolean; onChange: (checked: boolean) => void; label: string }) {
+  return (
+    <label className={`sign-toggle${checked ? " is-on" : ""}`}>
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      <span className="sign-toggle__switch" aria-hidden="true" />
+      <span className="sign-toggle__label">{label}</span>
+    </label>
+  );
+}
