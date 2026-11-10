@@ -198,6 +198,13 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 - **Privacy:** Emails go only to their recipient and never contain answers, scores, comments, or complaint text. The coordinator summary only says, per team, whether results were released or withheld, plus a generic line when there are signed check-ins or complaints to read.
 - **Consequences:** Reminder jobs reveal participation only inside the database (confidential attribution, as for submissions). Logs carry job type and error code, never recipients.
 
+## ADR-029 — Email images on a public R2 bucket
+
+- **Status:** accepted (owner decision, 2026-11-10); replaces the inline CID images used briefly after the first email template.
+- **Decision:** Email images (logo, sun, shell) are served from the R2 bucket `ino-assets` through the custom domain `assets.praiasertao.com.br`, under a versioned prefix (`email/v1/…`) with `Cache-Control: public, max-age=31536000, immutable`. The Worker reads the base URL from `EMAIL_ASSETS_URL` and falls back to its own `/assets/email` copy. `pnpm email:assets` uploads `public/assets/email/*.png`.
+- **Why:** CID attachments showed up as attachments or not at all in some clients; hosted HTTPS images on a dedicated domain keep the message small and render consistently.
+- **Consequences:** Outlook desktop and some corporate filters still hide remote images until the reader allows them or trusts the sender; every image keeps fixed dimensions and alt text so the layout holds. When an image changes, upload it under a new prefix (`v2`) and update `EMAIL_ASSETS_URL`. The r2.dev development URL is not used because it is rate-limited.
+
 ## Open questions before implementation/launch
 
 ### MVP password work factor exception — accepted 2026-09-09

@@ -27,6 +27,7 @@
 	"vars": {
 		"APP_ORIGIN": "https://ino.praiasertao.com.br",
 		"EMAIL_FROM": "Feedback <ino@mail.praiasertao.com.br>",
+		"EMAIL_ASSETS_URL": "https://assets.praiasertao.com.br/email/v1",
 		"APP_ENV": "production",
 		"SESSION_IDLE_DAYS": "7",
 		"SESSION_ABSOLUTE_DAYS": "30",

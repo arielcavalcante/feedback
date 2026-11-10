@@ -14,6 +14,7 @@
     "build": "node scripts/safe-build.mjs",
     "preview": "vite build && vite preview",
     "deploy": "pnpm build && wrangler deploy",
+    "email:assets": "node scripts/upload-email-assets.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

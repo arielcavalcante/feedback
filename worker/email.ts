@@ -1,6 +1,5 @@
 import type { Env } from "./env";
 import { translate, type Locale } from "../shared/localization";
-import { EMAIL_IMAGES, type EmailImage } from "./email-assets";
 
 export type AccountEmail = {
   to: string;
@@ -18,20 +17,23 @@ export type AccountEmail = {
   footnote?: string;
 };
 
+export type EmailImage = "logo" | "sun" | "shell";
+
+/** Public base URL of the email images (R2 bucket behind a custom domain, ADR-029). Falls back to the app's own copy. */
+export function emailAssetsUrl(env: Pick<Env, "APP_ORIGIN" | "EMAIL_ASSETS_URL">): string {
+  return (env.EMAIL_ASSETS_URL || `${env.APP_ORIGIN}/assets/email`).replace(/\/+$/, "");
+}
+
 export async function sendAccountEmail(env: Env, input: AccountEmail): Promise<string> {
   if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
     if (env.APP_ENV === "local") return "local-email-not-sent";
     throw new Error("email_not_configured");
   }
-  // Inline (CID) images: Outlook and corporate filters often block remote images by default.
-  const { html, text } = renderAccountEmail(env.APP_ORIGIN, input, "inline");
-  const attachments = (Object.keys(EMAIL_IMAGES) as EmailImage[]).map((name) => ({
-    filename: `ino-${name}.png`, content: EMAIL_IMAGES[name], content_type: "image/png", content_id: `ino-${name}`,
-  }));
+  const { html, text } = renderAccountEmail(env.APP_ORIGIN, input, emailAssetsUrl(env));
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: env.EMAIL_FROM, to: [input.to], subject: input.subject, text, html, attachments }),
+    body: JSON.stringify({ from: env.EMAIL_FROM, to: [input.to], subject: input.subject, text, html }),
   });
   if (!response.ok) throw new Error(`resend_${response.status}`);
   const payload = await response.json<{ id: string }>();
@@ -44,12 +46,12 @@ const FONT = "'Clash Grotesk', 'Helvetica Neue', Helvetica, Arial, sans-serif";
 /**
  * Table-based, inline-styled HTML that holds up in Outlook (Word engine: VML button, ghost table,
  * Arial fallback), Gmail (no <style> dependency for layout), Apple Mail (web font, dark mode), and phones.
- * Every interpolated value is escaped. Sent emails embed images inline (CID); previews can point at /assets/email.
+ * Every interpolated value is escaped. Images are absolute HTTPS URLs on the public assets host (EMAIL_ASSETS_URL).
  */
-export function renderAccountEmail(origin: string, input: AccountEmail, images: "inline" | "remote" = "remote"): { html: string; text: string } {
+export function renderAccountEmail(origin: string, input: AccountEmail, assetsUrl = `${origin}/assets/email`): { html: string; text: string } {
   const t = (message: string) => translate(message, input.locale);
   const e = escapeHtml;
-  const asset = (name: EmailImage) => images === "inline" ? `cid:ino-${name}` : e(`${origin}/assets/email/${name}.png`);
+  const asset = (name: EmailImage) => e(`${assetsUrl}/${name}.png`);
   const url = e(input.actionUrl);
   const lang = input.locale === "en" ? "en" : "pt-BR";
   const footerTitle = t("Feedback, with care.");

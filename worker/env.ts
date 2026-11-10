@@ -5,6 +5,8 @@ export interface Env {
   AUTH_PEPPER: string;
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
+  /** Public base URL for email images, e.g. https://assets.praiasertao.com.br/email/v1 (R2 custom domain). */
+  EMAIL_ASSETS_URL?: string;
   SESSION_IDLE_DAYS: string;
   SESSION_ABSOLUTE_DAYS: string;
   INVITATION_TTL_HOURS: string;

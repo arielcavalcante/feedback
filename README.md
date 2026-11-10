@@ -98,7 +98,7 @@ O anonimato é a promessa central do produto. As regras completas estão em [`do
 - **API:** Cloudflare Worker (`worker/`), que também é a fronteira de autorização e privacidade.
 - **Banco:** Cloudflare D1 (SQLite), schema em Drizzle (`worker/db/schema.ts`) e migrações em `drizzle/`.
 - **Agendamento:** Cron Trigger a cada 15 min. A lógica em `worker/scheduler/` cria os ciclos semanais a partir da âncora guardada no banco, abre e fecha os ciclos, inclui os participantes e dispara os e-mails da semana (`worker/notifications.ts`).
-- **E-mail:** Resend, com template próprio compatível com Outlook (imagens embutidas por CID).
+- **E-mail:** Resend, com template próprio compatível com Outlook. As imagens ficam num bucket R2 público em `assets.praiasertao.com.br` (`EMAIL_ASSETS_URL`).
 - **Autenticação:** convite por e-mail com token opaco de uso único, senha com PBKDF2-HMAC-SHA256 + pepper e sessões em cookie `HttpOnly`/`Secure` com token guardado só como hash.
 - **Idioma:** português do Brasil por padrão, com o catálogo em inglês mantido em `shared/localization.ts` (`?lang=en` pra revisar).
 - **Visual:** identidade do portfólio (`ariel-portfolio-react`): Clash Grotesk, papel/tinta/azul/laranja/dourado, menu fixo e botões em pílula.
@@ -160,6 +160,19 @@ pnpm run db:migrate:remote    # depois do deploy, quando houver migração nova
 - Segredos de produção (no Cloudflare, nunca no git): `AUTH_PEPPER` e `RESEND_API_KEY`.
 - Publique o código antes de rodar migrações que mudam a agenda, pra o scheduler já no ar não criar ciclos com a regra antiga.
 - Confira com `curl https://ino.praiasertao.com.br/api/health`.
+
+### Imagens dos e-mails (R2)
+
+Configuração única:
+
+```sh
+pnpm exec wrangler r2 bucket create ino-assets
+pnpm exec wrangler r2 bucket domain add ino-assets --domain assets.praiasertao.com.br --zone-id <ID da zona praiasertao.com.br> --min-tls 1.2
+pnpm email:assets            # sobe public/assets/email/*.png para ino-assets/email/v1/
+curl -I https://assets.praiasertao.com.br/email/v1/logo.png   # deve responder 200 e content-type image/png
+```
+
+Se mudar alguma imagem, suba com `pnpm email:assets --prefix email/v2` e troque o `EMAIL_ASSETS_URL` no `wrangler.jsonc` pra `…/email/v2`.
 
 ## Operação
 

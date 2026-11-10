@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { renderAccountEmail, sendAccountEmail, type AccountEmail } from "./email";
+import { emailAssetsUrl, renderAccountEmail, sendAccountEmail, type AccountEmail } from "./email";
 import type { Env } from "./env";
 
 const input: AccountEmail = {
@@ -25,11 +25,10 @@ describe("account email template", () => {
     expect(html).toContain('lang="pt-BR"');
   });
 
-  it("references inline CID images when sending", () => {
-    const inline = renderAccountEmail("https://ino.praiasertao.com.br", input, "inline").html;
-    expect(inline).toContain('src="cid:ino-logo"');
-    expect(inline).toContain('src="cid:ino-sun"');
-    expect(inline).not.toContain("/assets/email/");
+  it("points images at the hosted assets URL when configured", () => {
+    const hosted = renderAccountEmail("https://ino.praiasertao.com.br", input, "https://assets.praiasertao.com.br/email/v1").html;
+    for (const name of ["logo", "sun", "shell"]) expect(hosted).toContain(`src="https://assets.praiasertao.com.br/email/v1/${name}.png"`);
+    expect(hosted).not.toContain("cid:");
   });
 
   it("keeps the link usable in the plain-text part", () => {
@@ -39,17 +38,20 @@ describe("account email template", () => {
 });
 
 describe("Resend delivery", () => {
-  it("sends the images as inline CID attachments", async () => {
-    let payload: { html: string; attachments: Array<{ content_id: string; content_type: string; content: string }> } | undefined;
+  it("sends plain HTML with hosted images and no attachments", async () => {
+    let payload: { html: string; attachments?: unknown } | undefined;
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
       payload = JSON.parse(String(init?.body));
       return Response.json({ id: "email_123" });
     });
-    const env = { APP_ORIGIN: "https://ino.praiasertao.com.br", RESEND_API_KEY: "re_test", EMAIL_FROM: "ino <ino@mail.praiasertao.com.br>", APP_ENV: "production" } as Env;
+    const env = { APP_ORIGIN: "https://ino.praiasertao.com.br", EMAIL_ASSETS_URL: "https://assets.praiasertao.com.br/email/v1/", RESEND_API_KEY: "re_test", EMAIL_FROM: "ino <ino@mail.praiasertao.com.br>", APP_ENV: "production" } as Env;
     await expect(sendAccountEmail(env, input)).resolves.toBe("email_123");
     fetchMock.mockRestore();
-    expect(payload?.attachments.map((item) => item.content_id).sort()).toEqual(["ino-logo", "ino-shell", "ino-sun"]);
-    expect(payload?.attachments.every((item) => item.content_type === "image/png" && item.content.startsWith("iVBOR"))).toBe(true);
-    for (const id of ["ino-logo", "ino-sun", "ino-shell"]) expect(payload?.html).toContain(`cid:${id}`);
+    expect(payload?.attachments).toBeUndefined();
+    expect(payload?.html).toContain('src="https://assets.praiasertao.com.br/email/v1/logo.png"');
+  });
+
+  it("falls back to the app's own copy of the images", () => {
+    expect(emailAssetsUrl({ APP_ORIGIN: "https://ino.praiasertao.com.br" })).toBe("https://ino.praiasertao.com.br/assets/email");
   });
 });
