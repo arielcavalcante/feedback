@@ -191,6 +191,7 @@ Se mudar alguma imagem, suba com `pnpm email:assets --prefix email/v2` e troque 
 
 - [Decisões de arquitetura (ADRs)](docs/DECISIONS.md)
 - [Privacidade e anonimato](docs/PRIVACY.md)
+- [Segurança da informação — documento técnico pro InfoSec](docs/SEGURANCA.md)
 - [Setup e decisões operacionais](docs/SETUP.md)
 - [Modelo de dados](docs/DATA_MODEL.md)
 - [Roadmap](ROADMAP.md)

@@ -12,3 +12,4 @@
 - Keep secrets and production data out of source control, logs, fixtures, screenshots, and analytics.
 - Do not call development ratings “NPS” or implement AI analysis or external sharing in MVP.
 - If a request weakens anonymity or authentication security, or expands data collection, update the applicable ADR before implementation.
+- `docs/SEGURANCA.md` is the security and privacy architecture document for InfoSec. Whenever documentation is updated, review it against the code, update the affected sections and its commit/date header, and keep its Mermaid diagrams valid.
