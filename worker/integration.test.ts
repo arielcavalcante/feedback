@@ -8,6 +8,8 @@ import { createTestDatabase } from "./testing/sqlite-d1";
 
 const origin = "http://localhost:5173";
 const { db, d1 } = createTestDatabase();
+// Production ships paused (migration 0005); these tests exercise the running product and pause it explicitly below.
+db.prepare("UPDATE app_settings SET value = '0' WHERE key = 'checkins_paused'").run();
 const env = {
   DB: d1, APP_ORIGIN: origin, APP_ENV: "local", AUTH_PEPPER: "test-pepper", SESSION_IDLE_DAYS: "7", SESSION_ABSOLUTE_DAYS: "30",
   INVITATION_TTL_HOURS: "48", PASSWORD_RESET_TTL_MINUTES: "30", PASSWORD_PBKDF2_ITERATIONS: "1000",
@@ -243,5 +245,52 @@ describe("signed check-ins and conversations", () => {
     expect(employee.body.conversations).toEqual([expect.objectContaining({ heldOn: "2026-11-10", coordinatorName: "Davi Holanda", notes: expect.stringContaining("bloqueios") })]);
     expect((await call(await sessionFor(employees[1]), "GET", "/api/employee/dashboard")).body).toMatchObject({ conversations: [] });
     expect((await call(await sessionFor(employees[0]), "GET", "/api/coordinator/people")).status).toBe(403);
+  });
+});
+
+describe("pausing check-ins", () => {
+  it("ships paused by migration", () => {
+    const fresh = createTestDatabase();
+    expect(fresh.db.prepare("SELECT value FROM app_settings WHERE key = 'checkins_paused'").get()).toEqual({ value: "1" });
+  });
+
+  it("lets only admins pause, stops the open week, and blocks check-ins until resumed", async () => {
+    const opened = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
+    db.prepare(`INSERT INTO feedback_cycles (id, schedule_id, sequence_number, opens_at, closes_at, report_at, employee_email_at, coordinator_email_at, status, anonymity_threshold_snapshot, created_at, opened_at)
+      VALUES ('cycle-pause', 'default-fortaleza-weekly', 950, ?, ?, ?, ?, ?, 'open', 3, ?, ?)`).run(opened(-1), opened(2), opened(3), opened(-1), opened(3), opened(-1), opened(-1));
+    await runScheduler(env, new Date());
+    const employee = await sessionFor(employees[1]);
+    expect((await call<{ activeCycle: unknown }>(employee, "GET", "/api/employee/dashboard")).body.activeCycle).not.toBeNull();
+
+    expect((await call(employee, "PATCH", "/api/admin/settings", { checkinsPaused: true })).status).toBe(403);
+    const paused = await call<{ checkins: { paused: boolean; byName: string } }>(admin, "PATCH", "/api/admin/settings", { checkinsPaused: true });
+    expect(paused.body.checkins).toMatchObject({ paused: true, byName: "Admin" });
+    expect(db.prepare("SELECT status FROM feedback_cycles WHERE id = 'cycle-pause'").get()).toEqual({ status: "cancelled" });
+
+    const dashboard = await call<{ checkinsPaused: boolean; activeCycle: unknown }>(employee, "GET", "/api/employee/dashboard");
+    expect(dashboard.body).toMatchObject({ checkinsPaused: true, activeCycle: null });
+    expect((await call(employee, "POST", "/api/employee/feedback", { cycleId: "cycle-pause", coordinator: 4, team: 4, work: 4 })).status).toBe(409);
+    // Complaints keep working while check-ins are paused.
+    expect((await call(employee, "POST", "/api/employee/complaints", { topics: ["software"], body: "Ainda posso reclamar" })).status).toBe(201);
+    // While paused, a cycle that becomes due is cancelled instead of opened.
+    db.prepare(`INSERT INTO feedback_cycles (id, schedule_id, sequence_number, opens_at, closes_at, report_at, employee_email_at, coordinator_email_at, status, anonymity_threshold_snapshot, created_at)
+      VALUES ('cycle-due', 'default-fortaleza-weekly', 951, ?, ?, ?, ?, ?, 'scheduled', 3, ?)`).run(opened(-0.1), opened(6), opened(7), opened(-0.1), opened(7), opened(-1));
+    await runScheduler(env, new Date());
+    expect(db.prepare("SELECT status FROM feedback_cycles WHERE id = 'cycle-due'").get()).toEqual({ status: "cancelled" });
+
+    const resumed = await call<{ checkins: { paused: boolean } }>(admin, "PATCH", "/api/admin/settings", { checkinsPaused: false });
+    expect(resumed.body.checkins.paused).toBe(false);
+    expect((await call<{ checkinsPaused: boolean }>(employee, "GET", "/api/employee/dashboard")).body.checkinsPaused).toBe(false);
+  });
+
+  it("closes (instead of cancelling) a week that already has answers", async () => {
+    const opened = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
+    db.prepare(`INSERT INTO feedback_cycles (id, schedule_id, sequence_number, opens_at, closes_at, report_at, employee_email_at, coordinator_email_at, status, anonymity_threshold_snapshot, created_at, opened_at)
+      VALUES ('cycle-answered', 'default-fortaleza-weekly', 952, ?, ?, ?, ?, ?, 'open', 3, ?, ?)`).run(opened(-1), opened(2), opened(3), opened(-1), opened(3), opened(-1), opened(-1));
+    await runScheduler(env, new Date());
+    expect((await call(await sessionFor(employees[2]), "POST", "/api/employee/feedback", { cycleId: "cycle-answered", coordinator: 5, team: 5, work: 5 })).status).toBe(201);
+    await call(admin, "PATCH", "/api/admin/settings", { checkinsPaused: true });
+    expect(db.prepare("SELECT status FROM feedback_cycles WHERE id = 'cycle-answered'").get()).toEqual({ status: "closed" });
+    await call(admin, "PATCH", "/api/admin/settings", { checkinsPaused: false });
   });
 });

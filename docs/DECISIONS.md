@@ -205,6 +205,13 @@ Concise ADR-style records for agreed direction. Statuses are `accepted`, `propos
 - **Why:** CID attachments showed up as attachments or not at all in some clients; hosted HTTPS images on a dedicated domain keep the message small and render consistently.
 - **Consequences:** Outlook desktop and some corporate filters still hide remote images until the reader allows them or trusts the sender; every image keeps fixed dimensions and alt text so the layout holds. When an image changes, upload it under a new prefix (`v2`) and update `EMAIL_ASSETS_URL`. The r2.dev development URL is not used because it is rate-limited.
 
+## ADR-030 — Organization-wide pause of check-ins
+
+- **Status:** accepted (owner decision, 2026-11-10)
+- **Decision:** Admins can pause and resume the weekly check-ins for everyone from the admin home (`app_settings.checkins_paused`). Pausing closes the week in progress (or cancels it if nobody answered, so it doesn't show up as "not answered" for anyone), stops opening new weeks (each one that becomes due is cancelled), refuses check-ins and signing, and stops check-in emails. Complaints, conversations, past results and the Monday coordinator summary for a week that was closed with answers keep working. Resuming takes effect from the next Monday's cycle. Migration `0005` ships the product paused.
+- **Why:** Let the company stop the process at once (launch preparation, vacations, reorganizations) without touching data.
+- **Consequences:** Pause and resume are audited with the acting admin. A week closed early by a pause still reports only if it reached the minimum of 3 anonymous answers.
+
 ## Open questions before implementation/launch
 
 ### MVP password work factor exception — accepted 2026-09-09

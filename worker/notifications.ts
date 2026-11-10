@@ -9,6 +9,7 @@ import { sendAccountEmail, type AccountEmail } from "./email";
 import { translate, type Locale } from "../shared/localization";
 import { addLocalDays, localDateInZone, localDateTimeToUtc, nextOrSameWorkday, previousOrSameWorkday } from "./domain/schedule";
 import { effectiveThreshold } from "./domain/coordinator";
+import { checkinsPaused } from "./settings";
 
 const TIMEZONE = "America/Fortaleza";
 const SEND_TIME = "09:00:00";
@@ -40,6 +41,7 @@ export async function enqueueNotifications(env: Env, now: Date): Promise<void> {
     FROM feedback_cycles c JOIN feedback_schedules s ON s.id = c.schedule_id AND s.is_active = 1
     WHERE c.status IN ('open', 'closed', 'reported') AND c.closes_at > ?`).bind(new Date(now.getTime() - 3 * 86_400_000).toISOString()).all<CycleRow>();
 
+  const paused = await checkinsPaused(env);
   const statements: D1PreparedStatement[] = [];
   const enqueueParticipants = (cycle: CycleRow, type: JobType, scheduledFor: string) => env.DB.prepare(`INSERT INTO email_jobs
       (id, job_type, cycle_id, recipient_user_id, scheduled_for, status, attempt_count, idempotency_key, created_at, updated_at)
@@ -48,7 +50,7 @@ export async function enqueueNotifications(env: Env, now: Date): Promise<void> {
     ON CONFLICT(idempotency_key) DO NOTHING`).bind(type, scheduledFor, type, nowIso, nowIso, cycle.id);
 
   for (const cycle of cycles.results) {
-    if (cycle.status === "open" && cycle.closesAt > nowIso) {
+    if (!paused && cycle.status === "open" && cycle.closesAt > nowIso) {
       const { openAt, reminderAt } = employeeEmailTimes(cycle.opensAt, holidays);
       // People who join after the Friday reminder time only get the reminder.
       if (nowIso < reminderAt) statements.push(enqueueParticipants(cycle, "checkin_open", openAt));
@@ -122,7 +124,7 @@ async function buildEmail(env: Env, job: JobRow, now: Date): Promise<AccountEmai
   const appUrl = env.APP_ORIGIN;
 
   if (job.type === "checkin_open" || job.type === "checkin_reminder") {
-    if (cycle.closesAt <= nowIso) return null;
+    if (cycle.closesAt <= nowIso || cycle.status !== "open" || await checkinsPaused(env)) return null;
     const answered = await env.DB.prepare(`SELECT 1 AS answered FROM feedback_submissions s JOIN feedback_cycle_participants p ON p.id = s.participant_id
       WHERE p.cycle_id = ? AND p.employee_user_id = ? AND s.state = 'submitted'`).bind(cycle.id, job.userId).first<{ answered: number }>();
     if (answered) return null;

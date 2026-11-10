@@ -19,6 +19,8 @@ export type DevState = {
   submitted: boolean;
   showIntro: boolean;
   coordinatorScenario: CoordinatorScenario;
+  checkinsPaused: boolean;
+  pausedSince: string | null;
   /** Bumped by bar actions to remount the app with fresh data. */
   version: number;
 };
@@ -30,7 +32,7 @@ export const DEV_PERSONAS: Record<DevRole, CurrentUser> = {
 };
 
 const STORAGE_KEY = "feedback:dev-state";
-const DEFAULTS: DevState = { role: "employee", signedIn: true, cycleOpen: true, submitted: false, showIntro: false, coordinatorScenario: "open_below", version: 0 };
+const DEFAULTS: DevState = { role: "employee", signedIn: true, cycleOpen: true, submitted: false, showIntro: false, coordinatorScenario: "open_below", checkinsPaused: false, pausedSince: null, version: 0 };
 const introKey = (userId: string) => `feedback:intro-completed:${userId}`;
 
 function load(): DevState {

@@ -11,6 +11,7 @@ import { assertSameOrigin, HttpError, json, readJson } from "./http";
 import { runScheduler, snapshotParticipants } from "./scheduler/run";
 import { currentTeam, handleSubmitComplaint } from "./complaints";
 import { employeeConversations, handleCoordinatorPeople, handleCreateConversation, handleSignFeedback, handleUpdateConversation } from "./conversations";
+import { checkinsPaused, handleGetSettings, handleUpdateSettings } from "./settings";
 import { formatDate, requestLocale, translate } from "../shared/localization";
 
 const API_ERROR = "The email or password is incorrect.";
@@ -44,6 +45,8 @@ export default {
       if (request.method === "PATCH" && conversation) return await handleUpdateConversation(request, env, conversation[1]);
       if (request.method === "POST" && url.pathname === "/api/employee/complaints") return await handleSubmitComplaint(request, env);
       if (request.method === "GET" && url.pathname === "/api/coordinator/dashboard") return await handleCoordinatorDashboard(request, env);
+      if (request.method === "GET" && url.pathname === "/api/admin/settings") return await handleGetSettings(request, env);
+      if (request.method === "PATCH" && url.pathname === "/api/admin/settings") return await handleUpdateSettings(request, env);
       if (request.method === "GET" && url.pathname === "/api/admin/users") return await handleAdminUsers(request, env);
       if (request.method === "GET" && url.pathname === "/api/admin/teams") return await handleAdminTeams(request, env);
       if (request.method === "POST" && url.pathname === "/api/admin/teams") return await handleAdminCreateTeam(request, env);
@@ -258,8 +261,9 @@ type EmployeeCycleRow = {
 async function handleEmployeeDashboard(request: Request, env: Env): Promise<Response> {
   const user = await requireRole(request, env, "employee");
   const now = new Date().toISOString();
+  const paused = await checkinsPaused(env);
   const schedules = await env.DB.prepare("SELECT id FROM feedback_schedules WHERE is_active = 1").all<{ id: string }>();
-  if (schedules.results.length) await env.DB.batch(schedules.results.map((schedule) => snapshotParticipants(env, schedule.id, now)));
+  if (!paused && schedules.results.length) await env.DB.batch(schedules.results.map((schedule) => snapshotParticipants(env, schedule.id, now)));
   const rows = await env.DB.prepare(`SELECT c.id AS cycleId, c.opens_at AS opensAt, c.closes_at AS closesAt,
       c.status AS cycleStatus, t.name AS teamName, coordinator.display_name AS coordinatorName,
       s.id AS submissionId, s.is_signed AS isSigned
@@ -272,8 +276,8 @@ async function handleEmployeeDashboard(request: Request, env: Env): Promise<Resp
       AND c.status != 'cancelled' AND c.opens_at <= ?
     ORDER BY c.opens_at DESC`).bind(user.id, now).all<EmployeeCycleRow>();
 
-  const activeRow = rows.results.find((row) => row.cycleStatus === "open" && row.opensAt <= now && row.closesAt > now && !row.submissionId);
-  const answeredRow = rows.results.find((row) => row.cycleStatus === "open" && row.opensAt <= now && row.closesAt > now && row.submissionId);
+  const activeRow = paused ? undefined : rows.results.find((row) => row.cycleStatus === "open" && row.opensAt <= now && row.closesAt > now && !row.submissionId);
+  const answeredRow = paused ? undefined : rows.results.find((row) => row.cycleStatus === "open" && row.opensAt <= now && row.closesAt > now && row.submissionId);
   const answeredThisWeek = Boolean(answeredRow);
   const history = rows.results
     .filter((row) => row.closesAt <= now || row.cycleStatus === "closed" || row.cycleStatus === "reported")
@@ -286,6 +290,7 @@ async function handleEmployeeDashboard(request: Request, env: Env): Promise<Resp
 
   return json({
     team: team ? { name: team.teamName, coordinatorName: team.coordinatorName ?? null } : null,
+    checkinsPaused: paused,
     answeredThisWeek,
     thisWeek: answeredRow ? { cycleId: answeredRow.cycleId, closesAt: answeredRow.closesAt, signed: Boolean(answeredRow.isSigned) } : null,
     signedEvaluations,
@@ -315,6 +320,7 @@ async function handleEmployeeFeedback(request: Request, env: Env): Promise<Respo
 
   if (body.signed !== undefined && typeof body.signed !== "boolean") throw new HttpError(400, "invalid_feedback", "Rate every feedback area from 1 to 5.");
   const signed = body.signed === true;
+  if (await checkinsPaused(env)) throw new HttpError(409, "checkins_paused", "Check-ins are paused right now.");
   const now = new Date().toISOString();
   const participant = await env.DB.prepare(`SELECT participant.id
     FROM feedback_cycle_participants participant

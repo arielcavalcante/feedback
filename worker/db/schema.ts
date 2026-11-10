@@ -257,3 +257,11 @@ export const complaintTopics = sqliteTable("complaint_topics", {
   complaintId: text("complaint_id").notNull().references(() => complaints.id, { onDelete: "restrict" }),
   topicKey: text("topic_key").notNull(),
 }, (table) => [primaryKey({ columns: [table.complaintId, table.topicKey] })]);
+
+// Organization-wide switches set by admins (ADR-030). `checkins_paused` = "1" pauses every weekly check-in.
+export const appSettings = sqliteTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  updatedByUserId: text("updated_by_user_id").references(() => users.id, { onDelete: "restrict" }),
+});

@@ -56,6 +56,7 @@ Produção: **https://ino.praiasertao.com.br**
 - Não existe cadastro público. A administração convida as pessoas por e-mail (se o e-mail não sair, nada é salvo e dá pra tentar de novo), define os **perfis** de cada uma (admin, coordenação, colaborador — dá pra ter mais de um) e a **equipe**.
 - Cada equipe tem uma coordenação. Quem não está numa equipe com coordenação fica fora dos ciclos.
 - Desativar uma pessoa derruba as sessões dela na hora e mantém o histórico.
+- A administração pode **pausar as avaliações de todo mundo de uma vez** (e retomar depois). Pausado, a semana em andamento fecha (ou é descartada, se ninguém respondeu), nenhuma avaliação nova abre e os e-mails de avaliação param. Reclamar, conversas e resultados anteriores continuam funcionando. **O sistema sai pausado** depois da migração `0005`: é preciso retomar no admin pra começar.
 
 ### Primeiro acesso
 

@@ -3,7 +3,8 @@ import { api } from "../api";
 import { useLocale } from "../i18n";
 import { ErrorMessage, errorText, Field, initials, Primary } from "../components/ui";
 import { useToast } from "../components/Toast";
-import type { AdminTeam, AdminUser, RoleKey } from "../types";
+import type { AdminTeam, AdminUser, PauseState, RoleKey } from "../types";
+import { formatInZone } from "../components/ui";
 
 const ROLES: RoleKey[] = ["admin", "coordinator", "employee"];
 const STATUS_LABEL: Record<AdminUser["status"], string> = {
@@ -41,6 +42,7 @@ export function AdminSection({ currentUserId }: { currentUserId: string }) {
   }
   return (
     <>
+      <CheckinsPanel />
       <PeoplePanel users={users} teams={teams} currentUserId={currentUserId} onChanged={reload} />
       <TeamsPanel users={users} teams={teams} onChanged={reload} />
     </>
@@ -354,5 +356,65 @@ function TeamForm({ initial, coordinators, submitLabel, onSubmit, onCancel }: {
         <button type="button" className="text-button" onClick={onCancel}>{t("Cancel")}</button>
       </div>
     </form>
+  );
+}
+
+/** Organization-wide pause of the weekly check-ins (ADR-030). */
+function CheckinsPanel() {
+  const { t, locale } = useLocale();
+  const toast = useToast();
+  const [state, setState] = useState<PauseState | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    api<{ checkins: PauseState }>("/api/admin/settings").then(({ checkins }) => setState(checkins)).catch((caught) => setError(errorText(caught, "Something went wrong. Please try again.")));
+  }, []);
+
+  async function update(paused: boolean) {
+    setBusy(true); setError("");
+    try {
+      const { checkins } = await api<{ checkins: PauseState }>("/api/admin/settings", { method: "PATCH", body: JSON.stringify({ checkinsPaused: paused }) });
+      setState(checkins); setConfirming(false);
+      toast(t(paused ? "Check-ins paused for everyone." : "Check-ins are back. The next one opens on Monday."));
+    } catch (caught) {
+      setError(errorText(caught, "Something went wrong. Please try again."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="admin-panel checkins-panel" id="checkins" aria-labelledby="checkins-title">
+      <div className="section-heading">
+        <div><p className="eyebrow">{t("Weekly check-ins")}</p><h2 id="checkins-title">{t(state?.paused ? "Check-ins are paused" : "Check-ins are running")}</h2></div>
+        {state && <span className={`status-pill ${state.paused ? "status-pill--paused" : "status-pill--ready"}`}>{t(state.paused ? "Paused" : "Running")}</span>}
+      </div>
+      <p className="admin-panel__intro">{t(state?.paused
+        ? "Nobody gets a check-in or a check-in email while this is paused. Complaints, conversations and past results keep working."
+        : "Every Monday a new check-in opens for everyone on a team. Pausing stops it for the whole company at once.")}</p>
+      {state?.paused && state.since && (
+        <p className="helper checkins-panel__since">{t(state.byName ? "Paused on {date} by {name}." : "Paused on {date}.", { date: formatInZone(state.since, locale, { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }), name: state.byName ?? "" })}</p>
+      )}
+      <ErrorMessage message={error} />
+      {state && (confirming ? (
+        <div className="sign-confirm" role="group" aria-label={t("Pause check-ins")}>
+          <p>{t("This week’s check-in closes now for everyone (if nobody answered yet, it’s dropped) and no new one opens until you resume.")}</p>
+          <div>
+            <button type="button" className="text-button" disabled={busy} onClick={() => update(true)}>{t("Pause for everyone")}</button>
+            <button type="button" className="text-button" onClick={() => setConfirming(false)}>{t("Cancel")}</button>
+          </div>
+        </div>
+      ) : state.paused ? (
+        <button className="case-link primary admin-panel__add" type="button" disabled={busy} onClick={() => update(false)}>
+          <span>{t("Resume check-ins")}</span><span className="case-link__icon" aria-hidden="true" />
+        </button>
+      ) : (
+        <button className="case-link secondary admin-panel__add" type="button" onClick={() => setConfirming(true)}>
+          <span>{t("Pause check-ins")}</span><span className="case-link__icon" aria-hidden="true" />
+        </button>
+      ))}
+    </section>
   );
 }

@@ -56,6 +56,14 @@ export function handleOrg(method: string, path: string, body: Body): Reply | nul
     if (denied) return denied;
     const actorId = devStore.persona().id;
 
+    if (path === "/api/admin/settings") {
+      if (method === "PATCH") {
+        if (typeof body.checkinsPaused !== "boolean") return fail(400, "invalid_settings", "The request body is invalid.");
+        devStore.patch({ checkinsPaused: body.checkinsPaused, pausedSince: body.checkinsPaused ? new Date().toISOString() : null });
+      }
+      const { checkinsPaused, pausedSince } = devStore.get();
+      return ok({ checkins: { paused: checkinsPaused, since: checkinsPaused ? pausedSince : null, byName: checkinsPaused ? DEV_PERSONAS.admin.displayName : null } });
+    }
     if (method === "GET" && path === "/api/admin/users") return ok({ users });
     if (method === "GET" && path === "/api/admin/teams") return ok({ teams: teamsWithCounts() });
 
@@ -177,6 +185,13 @@ function cycleAt(index: number) {
 }
 
 function coordinatorDashboard(): CoordinatorDashboardData {
+  const data = coordinatorScenarioData();
+  const paused = devStore.get().checkinsPaused;
+  // Mirrors the Worker: pausing closes the open week and nothing new is scheduled.
+  return paused ? { ...data, checkinsPaused: true, nextCycle: null, teams: data.teams.map((team) => ({ ...team, openCycle: null })) } : { ...data, checkinsPaused: false };
+}
+
+function coordinatorScenarioData(): Omit<CoordinatorDashboardData, "checkinsPaused"> {
   const scenario = devStore.get().coordinatorScenario;
   const team = teams.find((item) => item.id === "team-produto")!;
   const memberCount = users.filter((user) => user.teamId === team.id && user.status !== "inactive").length;

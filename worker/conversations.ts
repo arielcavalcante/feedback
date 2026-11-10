@@ -4,6 +4,7 @@
 import type { Env } from "./env";
 import { audit, requireRole } from "./access";
 import { HttpError, json, readJson } from "./http";
+import { checkinsPaused } from "./settings";
 
 export type SignedEvaluation = {
   cycleId: string;
@@ -88,6 +89,7 @@ export async function handleSignFeedback(request: Request, env: Env): Promise<Re
   const user = await requireRole(request, env, "employee");
   const body = await readJson<{ cycleId?: unknown }>(request);
   if (typeof body.cycleId !== "string") throw new HttpError(400, "invalid_feedback", "Choose an active feedback cycle.");
+  if (await checkinsPaused(env)) throw new HttpError(409, "checkins_paused", "Check-ins are paused right now.");
   const now = new Date().toISOString();
   // Only while the week is open: signing after group results exist would let anyone subtract it from the average.
   const result = await env.DB.prepare(`UPDATE feedback_submissions SET is_signed = 1, signed_at = ?

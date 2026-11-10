@@ -8,6 +8,7 @@ type Sent = { to: string[]; subject: string; html: string; text: string };
 
 function setup() {
   const { db, d1 } = createTestDatabase();
+  db.prepare("UPDATE app_settings SET value = '0' WHERE key = 'checkins_paused'").run();
   const env = { DB: d1, APP_ORIGIN: "https://ino.praiasertao.com.br", APP_ENV: "production", RESEND_API_KEY: "re_test", EMAIL_FROM: "ino <ino@mail.praiasertao.com.br>" } as unknown as Env;
   const now = "2026-11-01T00:00:00.000Z";
   const user = (id: string, name: string, role: string) => {
@@ -112,6 +113,14 @@ describe("weekly notification emails", () => {
     let at = Date.parse("2026-11-09T12:05:00.000Z");
     for (let attempt = 2; attempt <= 5; attempt += 1) { await tick(env, new Date(at).toISOString()); at += 5 * 60_000 * 2 ** (attempt - 1); }
     expect(db.prepare("SELECT status FROM email_jobs WHERE recipient_user_id = 'e1' AND job_type = 'checkin_open'").get()).toEqual({ status: "failed" });
+  });
+
+  it("sends no check-in emails while check-ins are paused", async () => {
+    const { db, env } = setup();
+    await tick(env, "2026-11-09T11:00:00.000Z");
+    db.prepare("UPDATE app_settings SET value = '1' WHERE key = 'checkins_paused'").run();
+    const result = await tick(env, "2026-11-09T12:00:00.000Z");
+    expect(result).toMatchObject({ sent: 0, skipped: 4 });
   });
 
   it("skips people who were deactivated before the email went out", async () => {

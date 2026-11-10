@@ -216,6 +216,11 @@ small, .helper { color: color-mix(in srgb, var(--brand-blue) 72%, var(--paper));
 
 /* Coordinator results. */
 .status-pill--ready { background: var(--brand-blue); color: var(--paper); }
+.status-pill--paused { background: color-mix(in srgb, var(--ink) 10%, var(--paper)); color: var(--ink); }
+.paused-banner { display: flex; align-items: center; gap: 12px; margin: 24px clamp(8px, 3vw, 46px) 0; padding: 16px 20px; border-radius: 16px; background: color-mix(in srgb, var(--gold) 22%, var(--paper)); color: var(--ink); font-size: 15px; font-weight: 500; line-height: 1.4; }
+.paused-banner .shell-icon { color: var(--brand-blue); }
+.checkins-panel .sign-confirm { margin-top: 28px; }
+.checkins-panel__since { margin-top: 12px; }
 .pending-status { display: grid; gap: 16px; max-width: 360px; margin-top: 42px; }
 .pending-status .intro-history-card { min-height: 128px; }
 .pending-status .helper { max-width: 460px; }

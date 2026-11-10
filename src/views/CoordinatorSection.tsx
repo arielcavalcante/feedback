@@ -42,7 +42,10 @@ export function CoordinatorSection() {
     );
   }
 
-  return <>{data.teams.map((team, index) => <TeamResults key={team.id} team={team} nextCycle={data.nextCycle} anchor={index === 0} showName={data.teams.length > 1} />)}<TeamConversations /></>;
+  const pausedBanner = data.checkinsPaused && (
+    <p className="paused-banner" role="note"><span className="shell-icon" aria-hidden="true" />{t("Weekly check-ins are paused by the administration. Past results, conversations and complaints stay available.")}</p>
+  );
+  return <>{pausedBanner}{data.teams.map((team, index) => <TeamResults key={team.id} team={team} nextCycle={data.nextCycle} anchor={index === 0} showName={data.teams.length > 1} />)}<TeamConversations /></>;
 }
 
 function TeamResults({ team, nextCycle, anchor, showName }: { team: CoordinatorTeam; nextCycle: CoordinatorDashboardData["nextCycle"]; anchor: boolean; showName: boolean }) {

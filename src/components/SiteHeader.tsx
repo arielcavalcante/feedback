@@ -9,7 +9,7 @@ export function SiteHeader({ user, onSignOut, introMode = false }: { user: Curre
   const sectionLinks = [
     ...(user?.roles.includes("employee") ? [{ href: "#active-feedback", label: "This week" }, { href: "#conversations", label: "Conversations" }] : []),
     ...(user?.roles.includes("coordinator") ? [{ href: "#team-results", label: "My team" }, { href: "#team-people", label: "Conversations" }, { href: "#team-complaints", label: "Complaints" }] : []),
-    ...(user?.roles.includes("admin") ? [{ href: "#people", label: "People" }, { href: "#teams", label: "Teams" }] : []),
+    ...(user?.roles.includes("admin") ? [{ href: "#checkins", label: "Check-ins" }, { href: "#people", label: "People" }, { href: "#teams", label: "Teams" }] : []),
   ];
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);

@@ -544,12 +544,15 @@ function EmployeeSection({ onActiveCycle }: { user: CurrentUser; onActiveCycle: 
             <div className="section-heading">
               <div>
                 <p className="eyebrow">{t("This week")}</p>
-                <h2 id="active-feedback-title">{t(dashboard.activeCycle ? "How was your week?" : dashboard.answeredThisWeek ? "Check-in done" : "No check-in for you this week")}</h2>
+                <h2 id="active-feedback-title">{t(dashboard.checkinsPaused ? "Check-ins are paused" : dashboard.activeCycle ? "How was your week?" : dashboard.answeredThisWeek ? "Check-in done" : "No check-in for you this week")}</h2>
               </div>
               {dashboard.activeCycle && <span className="status-pill status-pill--pending">{t("Pending")}</span>}
               {!dashboard.activeCycle && dashboard.answeredThisWeek && <span className="status-pill status-pill--ready">{t("Done")}</span>}
+              {dashboard.checkinsPaused && <span className="status-pill status-pill--paused">{t("Paused")}</span>}
             </div>
-            <p className="active-feedback__intro">{t(dashboard.activeCycle
+            <p className="active-feedback__intro">{t(dashboard.checkinsPaused
+              ? "The administration paused the weekly check-ins for now. We’ll let you know when they’re back. Complaining still works."
+              : dashboard.activeCycle
               ? "Rate your coordinator, your team and your work whenever you want until Sunday night. Your answers only show up together with the group’s."
               : dashboard.answeredThisWeek
                 ? "A new check-in opens on Monday. Meanwhile, if something is bugging you, you can complain anytime."

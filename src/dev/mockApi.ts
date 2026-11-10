@@ -21,14 +21,16 @@ function cycleWindow(now = new Date()) {
 }
 
 function employeeDashboard() {
-  const { cycleOpen, submitted } = devStore.get();
+  const { cycleOpen: cycleOpenSetting, submitted, checkinsPaused } = devStore.get();
+  const cycleOpen = cycleOpenSetting && !checkinsPaused;
   const { opensAt, closesAt } = cycleWindow();
   const statuses = ["done", "done", "skipped", "done", "skipped", "done"] as const;
   const coordinator = DEV_PERSONAS.coordinator.displayName;
   return {
     team: { name: "Praia Sertão — Produto", coordinatorName: coordinator },
-    answeredThisWeek: !cycleOpen || submitted,
-    thisWeek: !cycleOpen || submitted ? { cycleId: "dev-cycle-current", closesAt: closesAt.toISOString(), signed: thisWeekSigned() } : null,
+    checkinsPaused,
+    answeredThisWeek: !checkinsPaused && (!cycleOpen || submitted),
+    thisWeek: !checkinsPaused && (!cycleOpen || submitted) ? { cycleId: "dev-cycle-current", closesAt: closesAt.toISOString(), signed: thisWeekSigned() } : null,
     ...employeeConversations(DEV_PERSONAS.employee.id),
     activeCycle: cycleOpen && !submitted ? {
       id: "dev-cycle-current",
@@ -97,7 +99,8 @@ function handle(method: string, path: string, body: Body): Response {
       if (!ratings.every((rating) => Number.isInteger(rating) && Number(rating) >= 1 && Number(rating) <= 5)) {
         return fail(400, "invalid_feedback", "Rate every feedback area from 1 to 5.");
       }
-      const { cycleOpen, submitted } = devStore.get();
+      const { cycleOpen, submitted, checkinsPaused } = devStore.get();
+      if (checkinsPaused) return fail(409, "checkins_paused", "Check-ins are paused right now.");
       if (!cycleOpen || body.cycleId !== "dev-cycle-current") return fail(404, "feedback_unavailable", "This feedback cycle is not available.");
       if (submitted) return fail(409, "feedback_submitted", "You already completed this feedback cycle.");
       devStore.patch({ submitted: true });
